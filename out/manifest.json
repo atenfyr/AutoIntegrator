@@ -1,0 +1,7 @@
+{
+    "name": "AutoIntegrator",
+    "version_number": "1.0.0",
+    "author": "atenfyr",
+    "website_url": "https://github.com/atenfyr/AutoIntegrator",
+    "description": "Load traditional AML mods through UE4SS"
+}

@@ -1,9 +1,11 @@
+#define CPPHTTPLIB_OPENSSL_SUPPORT
+#include "cpp-httplib/httplib.h"
 #include <stdio.h>
-#include <windows.h>
 #include <fstream>
 #include <UE4SSProgram.hpp>
 #include <Mod/CppUserModBase.hpp>
 #include <DynamicOutput/DynamicOutput.hpp>
+#include <windows.h>
 
 using namespace RC;
 
@@ -70,6 +72,111 @@ std::string AutoIntegrator_get_dll_path()
     return out_str_narrow;
 }
 
+bool AutoIntegrator_download_exe(std::string folder_path, std::string ver)
+{
+    httplib::Headers headers = {
+        { "User-Agent", ("atenfyr.com/" + ver) }
+    };
+
+#ifdef CPPHTTPLIB_OPENSSL_SUPPORT
+    httplib::SSLClient cli("github.com");
+    cli.set_ca_cert_path(folder_path + "/ca-bundle.crt");
+    cli.enable_server_certificate_verification(true);
+#else
+    httplib::Client cli("github.com");
+#endif
+
+    std::wstring_convert<std::codecvt_utf8_utf16<wchar_t>> converter;
+
+    bool success1 = false;
+    std::string latest_ver;
+    try
+    {
+        if (auto res = cli.Get("/atenfyr/AstroModLoader-Classic/releases/latest", headers))
+        {
+            //Output::send<LogLevel::Normal>(std::to_wstring(res->status));
+
+            if (res->status >= 300 && res->status < 400)
+            {
+                // redirect
+                std::string latest_link = res->get_header_value("location");
+                //Output::send<LogLevel::Verbose>(converter.from_bytes(latest_link) + L"\n");
+                if (latest_link.back() == '/') latest_link = latest_link.substr(0, latest_link.size() - 1);
+                latest_ver = latest_link.substr(latest_link.find_last_of('/') + 1);
+                if (latest_ver.front() == 'v') latest_ver = latest_ver.substr(1);
+                success1 = true;
+            }
+        }
+    }
+    catch(...)
+    {
+        Output::send<LogLevel::Error>(L"Failed to retrieve the latest version of AstroModIntegrator Classic\n");
+    }
+
+    if (success1) Output::send<LogLevel::Verbose>(L"Latest version of AstroModIntegrator Classic: v" + converter.from_bytes(latest_ver) + L"\n");
+
+    bool success2 = false;
+    try
+    {
+        if (success1 && latest_ver != ver) // did we successfully get the latest version, and do we actually need to update?
+        {
+            Output::send<LogLevel::Verbose>(L"Updating AstroModIntegrator Classic...\n");
+            if (auto res = cli.Get("/atenfyr/AstroModLoader-Classic/releases/download/v" + latest_ver + "/ModIntegrator-win-x64.exe", headers))
+            {
+                // follow redirects
+                while (res->status >= 300 && res->status < 400)
+                {
+                    std::string newLoc = res->get_header_value("location");
+                    if (newLoc.substr(0, std::string{ "http://" }.size()) == "http://") newLoc = newLoc.substr(std::string{ "http://" }.size());
+                    if (newLoc.substr(0, std::string{ "https://" }.size()) == "https://") newLoc = newLoc.substr(std::string{ "https://" }.size());
+                    std::string domain = newLoc.substr(0, newLoc.find_first_of('/'));
+                    newLoc = newLoc.substr(newLoc.find_first_of('/') + 1);
+
+                    Output::send<LogLevel::Verbose>(L"Redirect: " + converter.from_bytes(domain) + L", " + converter.from_bytes(newLoc) + L"\n");
+#ifdef CPPHTTPLIB_OPENSSL_SUPPORT
+                    httplib::SSLClient cli2(domain);
+                    cli.set_ca_cert_path(folder_path + "/ca-bundle.crt");
+                    cli.enable_server_certificate_verification(true);
+#else
+                    httplib::Client cli2(domain);
+#endif
+                    res = cli2.Get(newLoc, headers);
+                }
+
+                // download file
+                if (res->status == httplib::StatusCode::OK_200)
+                {
+                    std::ofstream fs(folder_path + "/ModIntegrator.exe", std::ios::out | std::ios::binary);
+                    fs.write((res->body).data(), (res->body).size());
+                    fs.close();
+                    Output::send<LogLevel::Verbose>(L"Successfully downloaded ModIntegrator.exe\n");
+                    success2 = true;
+                }
+                else
+                {
+                    throw std::runtime_error("Invalid HTTP status code: " + std::to_string(res->status));
+                }
+            }
+            else
+            {
+                throw std::runtime_error("HTTP request failed: " + httplib::to_string(res.error()));
+            }
+        }
+    }
+    catch (const std::runtime_error& err)
+    {
+        const char* exceptionMsg = err.what();
+        std::string exceptionMsgCpp = exceptionMsg;
+        Output::send<LogLevel::Error>(L"Failed to update the local copy of AstroModIntegrator Classic. " + converter.from_bytes(exceptionMsgCpp) + L"\n");
+    }
+    catch (...)
+    {
+        Output::send<LogLevel::Error>(L"Failed to update the local copy of AstroModIntegrator Classic.\n");
+    }
+
+    return success2;
+}
+
 // END NON-MIT LICENSED SECTION //
 
 // ALL CODE FROM THIS POINT ON IS MIT LICENSED BY ATENFYR
@@ -93,15 +200,13 @@ void AutoIntegrator_integrate(std::string paksPath1, std::string paksPath2, std:
     std::string game_exec_dir_narrow = converter.to_bytes(game_exec_dir);
 
     std::string finalCmd = folder_path + "/ModIntegrator.exe [ " + paksPath1 + " " + paksPath2 + " ] " + game_exec_dir_narrow + "/../../Content/Paks";
-    std::wstring finalCmd_cpp = converter.from_bytes(finalCmd) + L"\n";
-    const wchar_t* finalCmd_wide = finalCmd_cpp.c_str();
+    std::wstring finalCmd_wide = converter.from_bytes(finalCmd) + L"\n";
     Output::send<LogLevel::Verbose>(finalCmd_wide);
 
     std::string integrator_out = AutoIntegrator_exec(finalCmd.c_str());
     AutoIntegrator_rtrim(integrator_out);
     integrator_out += "\n";
-    std::wstring integrator_out_cpp = converter.from_bytes(integrator_out);
-    const wchar_t* integrator_out_wide = integrator_out_cpp.c_str();
+    std::wstring integrator_out_wide = converter.from_bytes(integrator_out);
     Output::send<LogLevel::Normal>(integrator_out_wide);
 }
 
@@ -113,8 +218,13 @@ public:
 
     AutoIntegrator() : CppUserModBase()
     {
-        folder_path = AutoIntegrator_get_dll_path() + "/../..";
+        ver = AutoIntegrator_exec(folder_path + "/ModIntegrator.exe version");
+        AutoIntegrator_rtrim(ver);
 
+        folder_path = AutoIntegrator_get_dll_path() + "/../..";
+        AutoIntegrator_download_exe(folder_path, ver);
+
+        // re-fetch version in case we auto-updated
         ver = AutoIntegrator_exec(folder_path + "/ModIntegrator.exe version");
         AutoIntegrator_rtrim(ver);
 

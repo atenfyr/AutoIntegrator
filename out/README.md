@@ -33,3 +33,6 @@ All other lines are treated as comments.
 ```
 
 If this mod is installed through AstroModLoader Classic, the "config.txt" file can only be edited by modifying the .pak file itself through a tool such as UAssetGUI.
+
+## License
+The source code for this mod is available on GitHub at https://github.com/atenfyr/AutoIntegrator. It is licensed under the MIT license.

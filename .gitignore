@@ -1,4 +1,5 @@
 build
+pak/UE4SS
 out/AutoIntegrator/repak_bind
 out/AutoIntegrator/repak_bind.so
 out/AutoIntegrator/repak_bind.dll

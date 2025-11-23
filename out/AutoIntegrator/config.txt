@@ -1,0 +1,10 @@
+default
+default
+true
+
+This is the AutoIntegrator config. Modify the first 3 lines as needed. DON'T MODIFY THIS FILE UNLESS YOU KNOW WHAT YOU'RE DOING!
+Line 1: path to folder containing mod paks. "default" = %LOCALAPPDATA\Astro\Saved\Paks; otherwise, an absolute path. LogicMods folder is also automatically integrated
+Line 2: folder to output integrated pak to. "default" = Line 1; "LogicMods" = the LogicMods folder; otherwise, an absolute path
+Line 3: whether or not to auto-update ModIntegrator.exe. "true" = yes. "false" = no
+All other lines are treated as comments.
+

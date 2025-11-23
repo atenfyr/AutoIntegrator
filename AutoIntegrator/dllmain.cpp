@@ -72,8 +72,15 @@ std::string AutoIntegrator_get_dll_path()
     return out_str_narrow;
 }
 
+// END NON-MIT LICENSED SECTION //
+
+// ALL CODE FROM THIS POINT ON IS MIT LICENSED BY ATENFYR
+// SEE THE "LICENSE" FILE FOR MORE INFORMATION
+
 bool AutoIntegrator_download_exe(std::string folder_path, std::string ver)
 {
+    Output::send<LogLevel::Normal>(L"Checking for updates to AstroModIntegrator Classic...\n");
+
     httplib::Headers headers = {
         { "User-Agent", ("atenfyr.com/" + ver) }
     };
@@ -108,7 +115,7 @@ bool AutoIntegrator_download_exe(std::string folder_path, std::string ver)
             }
         }
     }
-    catch(...)
+    catch (...)
     {
         Output::send<LogLevel::Error>(L"Failed to retrieve the latest version of AstroModIntegrator Classic\n");
     }
@@ -149,7 +156,7 @@ bool AutoIntegrator_download_exe(std::string folder_path, std::string ver)
                     std::ofstream fs(folder_path + "/ModIntegrator.exe", std::ios::out | std::ios::binary);
                     fs.write((res->body).data(), (res->body).size());
                     fs.close();
-                    Output::send<LogLevel::Verbose>(L"Successfully downloaded ModIntegrator.exe\n");
+                    Output::send<LogLevel::Normal>(L"Successfully downloaded ModIntegrator.exe\n");
                     success2 = true;
                 }
                 else
@@ -177,12 +184,7 @@ bool AutoIntegrator_download_exe(std::string folder_path, std::string ver)
     return success2;
 }
 
-// END NON-MIT LICENSED SECTION //
-
-// ALL CODE FROM THIS POINT ON IS MIT LICENSED BY ATENFYR
-// SEE THE "LICENSE" FILE FOR MORE INFORMATION
-
-void AutoIntegrator_integrate(std::string paksPath1, std::string paksPath2, std::string folder_path)
+void AutoIntegrator_integrate(std::string paksPath1, std::string paksPath2, std::string folder_path, std::string outPath)
 {
     std::wstring_convert<std::codecvt_utf8_utf16<wchar_t>> converter;
 
@@ -200,6 +202,7 @@ void AutoIntegrator_integrate(std::string paksPath1, std::string paksPath2, std:
     std::string game_exec_dir_narrow = converter.to_bytes(game_exec_dir);
 
     std::string finalCmd = folder_path + "/ModIntegrator.exe [ " + paksPath1 + " " + paksPath2 + " ] " + game_exec_dir_narrow + "/../../Content/Paks";
+    if (!outPath.empty() && outPath != "default") finalCmd += " " + outPath;
     std::wstring finalCmd_wide = converter.from_bytes(finalCmd) + L"\n";
     Output::send<LogLevel::Verbose>(finalCmd_wide);
 
@@ -218,17 +221,37 @@ public:
 
     AutoIntegrator() : CppUserModBase()
     {
-        ver = AutoIntegrator_exec(folder_path + "/ModIntegrator.exe version");
-        AutoIntegrator_rtrim(ver);
-
-        folder_path = AutoIntegrator_get_dll_path() + "/../..";
-        AutoIntegrator_download_exe(folder_path, ver);
-
-        // re-fetch version in case we auto-updated
-        ver = AutoIntegrator_exec(folder_path + "/ModIntegrator.exe version");
-        AutoIntegrator_rtrim(ver);
-
         std::wstring_convert<std::codecvt_utf8_utf16<wchar_t>> converter;
+
+        // init
+        folder_path = AutoIntegrator_get_dll_path() + "/../..";
+        ver = AutoIntegrator_exec(folder_path + "/ModIntegrator.exe version");
+        AutoIntegrator_rtrim(ver);
+
+        // pull config
+        std::string paksPath;
+        std::string outPath;
+        std::string autoUpdateStr;
+        std::ifstream in(folder_path + "/config.txt", std::ios_base::in);
+        std::getline(in, paksPath);
+        std::getline(in, outPath);
+        std::getline(in, autoUpdateStr);
+        in.close();
+
+        AutoIntegrator_rtrim(paksPath);
+        AutoIntegrator_rtrim(outPath);
+        AutoIntegrator_rtrim(autoUpdateStr);
+        bool autoUpdate = !(autoUpdateStr == "false");
+
+        if (autoUpdate)
+        {
+            AutoIntegrator_download_exe(folder_path, ver);
+
+            // re-fetch version in case we auto-updated
+            ver = AutoIntegrator_exec(folder_path + "/ModIntegrator.exe version");
+            AutoIntegrator_rtrim(ver);
+        }
+
         std::wstring ver_wide_cpp = converter.from_bytes(ver);
         const wchar_t* ver_wide = ver_wide_cpp.c_str();
 
@@ -250,19 +273,14 @@ public:
         log_out_2 += L"\n";
         Output::send<LogLevel::Verbose>(log_out_2);
 
-        std::string paksPath;
-        std::ifstream in(folder_path + "/paks_dir.txt", std::ios_base::in);
-        std::getline(in, paksPath);
-        in.close();
-
         std::wstring logicMods_dir_wide = UE4SSProgram::get_program().get_game_executable_directory();
         std::string logicMods_dir = converter.to_bytes(logicMods_dir_wide);
         logicMods_dir += "/../../Content/Paks/LogicMods";
-
-        AutoIntegrator_rtrim(paksPath);
         AutoIntegrator_rtrim(logicMods_dir);
 
-        AutoIntegrator_integrate(paksPath, logicMods_dir, folder_path);
+        if (outPath == "LogicMods") outPath = logicMods_dir;
+
+        AutoIntegrator_integrate(paksPath, logicMods_dir, folder_path, outPath);
     }
 
     ~AutoIntegrator() override

@@ -7,8 +7,10 @@
 
 using namespace RC;
 
+// BEGIN NON-MIT LICENSED SECTION //
+
 // THE FOLLOWING METHODS ARE ADAPTED FROM STACK OVERFLOW ANSWERS!
-// THEY ARE NOT LICENSED UNDER MIT
+// THEY ARE NOT LICENSED UNDER MIT. SEE COMMENTS FOR FURTHER INFORMATION
 
 // CC BY-SA 2.5 (https://creativecommons.org/licenses/by-sa/2.5/se/deed.en)
 // This code is copyrighted by StackOverflow user "waqas" https://stackoverflow.com/users/58008/waqas
@@ -42,9 +44,9 @@ inline void AutoIntegrator_rtrim(std::string& s) {
 // This code is copyrighted by StackOverflow user "mkaes" https://stackoverflow.com/users/264338/mkaes
 // Minor changes were made to this source code from the original. No warranties are given. See the original license text for more information.
 // https://stackoverflow.com/a/6924332
-std::string get_dll_path()
+std::string AutoIntegrator_get_dll_path()
 {
-    wchar_t path[MAX_PATH];
+    wchar_t path[32768]; // not MAX_PATH just in case... but MAX_PATH is probably reasonable here
     HMODULE hm = NULL;
 
     if (GetModuleHandleExW(GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS |
@@ -68,8 +70,41 @@ std::string get_dll_path()
     return out_str_narrow;
 }
 
-// ALL CODE FROM THIS POINT ON IS MIT-LICENSED BY ATENFYR
-// SEE LICENSE.MD FOR MORE INFORMATION
+// END NON-MIT LICENSED SECTION //
+
+// ALL CODE FROM THIS POINT ON IS MIT LICENSED BY ATENFYR
+// SEE THE "LICENSE" FILE FOR MORE INFORMATION
+
+void AutoIntegrator_integrate(std::string paksPath1, std::string paksPath2, std::string folder_path)
+{
+    std::wstring_convert<std::codecvt_utf8_utf16<wchar_t>> converter;
+
+    Output::send<LogLevel::Normal>(L"Performing integration...\n");
+
+    if (paksPath1.empty() || paksPath1 == "default")
+    {
+        // default
+        char* localappdata = getenv("LOCALAPPDATA");
+        std::string localappdata2 = localappdata;
+        paksPath1 = localappdata2 + "/Astro/Saved/Paks";
+    }
+
+    std::wstring game_exec_dir = UE4SSProgram::get_program().get_game_executable_directory();
+    std::string game_exec_dir_narrow = converter.to_bytes(game_exec_dir);
+
+    std::string finalCmd = folder_path + "/ModIntegrator.exe [ " + paksPath1 + " " + paksPath2 + " ] " + game_exec_dir_narrow + "/../../Content/Paks";
+    std::wstring finalCmd_cpp = converter.from_bytes(finalCmd) + L"\n";
+    const wchar_t* finalCmd_wide = finalCmd_cpp.c_str();
+    Output::send<LogLevel::Verbose>(finalCmd_wide);
+
+    std::string integrator_out = AutoIntegrator_exec(finalCmd.c_str());
+    AutoIntegrator_rtrim(integrator_out);
+    integrator_out += "\n";
+    std::wstring integrator_out_cpp = converter.from_bytes(integrator_out);
+    const wchar_t* integrator_out_wide = integrator_out_cpp.c_str();
+    Output::send<LogLevel::Normal>(integrator_out_wide);
+}
+
 class AutoIntegrator : public RC::CppUserModBase
 {
 public:
@@ -78,7 +113,7 @@ public:
 
     AutoIntegrator() : CppUserModBase()
     {
-        folder_path = get_dll_path() + "/../..";
+        folder_path = AutoIntegrator_get_dll_path() + "/../..";
 
         ver = AutoIntegrator_exec(folder_path + "/ModIntegrator.exe version");
         AutoIntegrator_rtrim(ver);
@@ -105,37 +140,19 @@ public:
         log_out_2 += L"\n";
         Output::send<LogLevel::Verbose>(log_out_2);
 
-        Output::send<LogLevel::Normal>(L"Performing integration...\n");
-
         std::string paksPath;
         std::ifstream in(folder_path + "/paks_dir.txt", std::ios_base::in);
         std::getline(in, paksPath);
         in.close();
 
+        std::wstring logicMods_dir_wide = UE4SSProgram::get_program().get_game_executable_directory();
+        std::string logicMods_dir = converter.to_bytes(logicMods_dir_wide);
+        logicMods_dir += "/../../Content/Paks/LogicMods";
+
         AutoIntegrator_rtrim(paksPath);
+        AutoIntegrator_rtrim(logicMods_dir);
 
-        if (paksPath.empty() || paksPath == "default")
-        {
-            // default
-            char* localappdata = getenv("LOCALAPPDATA");
-            std::string localappdata2 = localappdata;
-            paksPath = localappdata2 + "/Astro/Saved/Paks";
-        }
-
-        std::wstring game_exec_dir = UE4SSProgram::get_program().get_game_executable_directory();
-        std::string game_exec_dir_narrow = converter.to_bytes(game_exec_dir);
-
-        std::string finalCmd = folder_path + "/ModIntegrator.exe " + paksPath + " " + game_exec_dir_narrow + "/../../Content/Paks";
-        std::wstring finalCmd_cpp = converter.from_bytes(finalCmd) + L"\n";
-        const wchar_t* finalCmd_wide = finalCmd_cpp.c_str();
-        Output::send<LogLevel::Verbose>(finalCmd_wide);
-
-        std::string integrator_out = AutoIntegrator_exec(finalCmd.c_str());
-        AutoIntegrator_rtrim(integrator_out);
-        integrator_out += "\n";
-        std::wstring integrator_out_cpp = converter.from_bytes(integrator_out);
-        const wchar_t* integrator_out_wide = integrator_out_cpp.c_str();
-        Output::send<LogLevel::Normal>(integrator_out_wide);
+        AutoIntegrator_integrate(paksPath, logicMods_dir, folder_path);
     }
 
     ~AutoIntegrator() override

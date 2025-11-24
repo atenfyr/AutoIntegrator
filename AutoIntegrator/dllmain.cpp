@@ -201,8 +201,8 @@ void AutoIntegrator_integrate(std::string paksPath1, std::string paksPath2, std:
     std::wstring game_exec_dir = UE4SSProgram::get_program().get_game_executable_directory();
     std::string game_exec_dir_narrow = converter.to_bytes(game_exec_dir);
 
-    std::string finalCmd = folder_path + "/ModIntegrator.exe [ " + paksPath1 + " " + paksPath2 + " ] " + game_exec_dir_narrow + "/../../Content/Paks";
-    if (!outPath.empty() && outPath != "default") finalCmd += " " + outPath;
+    std::string finalCmd = folder_path + "/ModIntegrator.exe [ \"" + paksPath1 + "\" \"" + paksPath2 + "\" ] \"" + game_exec_dir_narrow + "/../../Content/Paks\"";
+    if (!outPath.empty() && outPath != "default") finalCmd += " \"" + outPath + "\"";
     std::wstring finalCmd_wide = converter.from_bytes(finalCmd) + L"\n";
     Output::send<LogLevel::Verbose>(finalCmd_wide);
 

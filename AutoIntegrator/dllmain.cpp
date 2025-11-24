@@ -15,24 +15,6 @@ using namespace RC;
 // THEY ARE NOT LICENSED UNDER MIT. SEE COMMENTS FOR FURTHER INFORMATION
 
 // CC BY-SA 2.5 (https://creativecommons.org/licenses/by-sa/2.5/se/deed.en)
-// This code is copyrighted by StackOverflow user "waqas" https://stackoverflow.com/users/58008/waqas
-// Minor changes were made to this source code from the original. No warranties are given. See the original license text for more information.
-// https://stackoverflow.com/a/478960
-std::string AutoIntegrator_exec(std::string cmd_cpp) {
-    const char* cmd = cmd_cpp.c_str();
-    std::array<char, 128> buffer;
-    std::string result;
-    std::unique_ptr<FILE, decltype(&_pclose)> pipe(_popen(cmd, "r"), _pclose);
-    if (!pipe) {
-        throw std::runtime_error("popen() failed!");
-    }
-    while (fgets(buffer.data(), static_cast<int>(buffer.size()), pipe.get()) != nullptr) {
-        result += buffer.data();
-    }
-    return result;
-}
-
-// CC BY-SA 2.5 (https://creativecommons.org/licenses/by-sa/2.5/se/deed.en)
 // This code is copyrighted by StackOverflow user "Evan Teran" https://stackoverflow.com/users/13430/evan-teran
 // Minor changes were made to this source code from the original. No warranties are given. See the original license text for more information.
 // https://stackoverflow.com/a/217605
@@ -53,7 +35,7 @@ std::string AutoIntegrator_get_dll_path()
 
     if (GetModuleHandleExW(GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS |
         GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT,
-        (LPCWSTR)&AutoIntegrator_exec, &hm) == 0)
+        (LPCWSTR)&AutoIntegrator_rtrim, &hm) == 0)
     {
         int ret = GetLastError();
         fprintf(stderr, "GetModuleHandle failed, error = %d\n", ret);
@@ -76,6 +58,74 @@ std::string AutoIntegrator_get_dll_path()
 
 // ALL CODE FROM THIS POINT ON IS MIT LICENSED BY ATENFYR
 // SEE THE "LICENSE" FILE FOR MORE INFORMATION
+
+std::string AutoIntegrator_exec(std::string cmd_cpp) {
+    SECURITY_ATTRIBUTES sa;
+    sa.nLength = sizeof(SECURITY_ATTRIBUTES);
+    sa.lpSecurityDescriptor = NULL;
+    sa.bInheritHandle = TRUE;
+
+    HANDLE hReadPipe, hWritePipe;
+    if (!CreatePipe(&hReadPipe, &hWritePipe, &sa, 0)) throw std::runtime_error("Failed to create pipe");
+
+    STARTUPINFOA si;
+    PROCESS_INFORMATION pi;
+    ZeroMemory(&si, sizeof(si));
+    ZeroMemory(&pi, sizeof(pi));
+
+    si.cb = sizeof(si);
+    si.dwFlags = STARTF_USESHOWWINDOW | STARTF_USESTDHANDLES;
+    si.wShowWindow = SW_HIDE;
+    si.hStdOutput = hWritePipe;
+    si.hStdError = hWritePipe;
+
+    char* cmd = _strdup(cmd_cpp.c_str());
+
+    std::string output;
+
+    try
+    {
+        if (!CreateProcessA(NULL, cmd, NULL, NULL, TRUE, CREATE_NO_WINDOW, NULL, NULL, &si, &pi)) throw std::runtime_error("Failed to create process");
+
+        CloseHandle(hWritePipe);
+
+        try
+        {
+            char buffer[4096];
+            DWORD bytesRead;
+
+            while (ReadFile(hReadPipe, buffer, sizeof(buffer) - 1, &bytesRead, NULL) && bytesRead > 0)
+            {
+                buffer[bytesRead] = '\0';
+                output += buffer;
+            }
+
+            WaitForSingleObject(pi.hProcess, INFINITE);
+        }
+        catch(...)
+        {
+            CloseHandle(pi.hProcess);
+            CloseHandle(pi.hThread);
+            CloseHandle(hReadPipe);
+            free(cmd);
+            throw;
+        }
+
+        CloseHandle(pi.hProcess);
+        CloseHandle(pi.hThread);
+        CloseHandle(hReadPipe);
+        free(cmd);
+    }
+    catch (...)
+    {
+        CloseHandle(hReadPipe);
+        CloseHandle(hWritePipe);
+        free(cmd);
+        throw;
+    }
+
+    return output;
+}
 
 bool AutoIntegrator_download_exe(std::string folder_path, std::string ver)
 {

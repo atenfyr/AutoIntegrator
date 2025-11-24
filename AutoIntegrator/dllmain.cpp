@@ -273,10 +273,7 @@ public:
     {
         std::wstring_convert<std::codecvt_utf8_utf16<wchar_t>> converter;
 
-        // init
         folder_path = AutoIntegrator_get_dll_path() + "/../..";
-        ver = AutoIntegrator_exec(folder_path + "/ModIntegrator.exe version");
-        AutoIntegrator_rtrim(ver);
 
         // pull config
         std::string paksPath;
@@ -293,13 +290,57 @@ public:
         AutoIntegrator_rtrim(autoUpdateStr);
         bool autoUpdate = !(autoUpdateStr == "false");
 
+        // init
+        try
+        {
+            ver = AutoIntegrator_exec(folder_path + "/ModIntegrator.exe version");
+            AutoIntegrator_rtrim(ver);
+        }
+        catch (const std::runtime_error& err)
+        {
+            // force an auto-update and try again
+            ver = "INVALID";
+
+            // unless we can't auto-update...
+            if (!autoUpdate)
+            {
+                Output::send<LogLevel::Error>(L"Failed to execute ModIntegrator.exe: " + converter.from_bytes(err.what()) + L"\n");
+                throw;
+            }
+        }
+        catch (...)
+        {
+            // force an auto-update and try again
+            ver = "INVALID";
+
+            // unless we can't auto-update...
+            if (!autoUpdate)
+            {
+                Output::send<LogLevel::Error>(L"Failed to execute ModIntegrator.exe for an unknown reason\n");
+                throw;
+            }
+        }
+
         if (autoUpdate)
         {
             AutoIntegrator_download_exe(folder_path, ver);
 
             // re-fetch version in case we auto-updated
-            ver = AutoIntegrator_exec(folder_path + "/ModIntegrator.exe version");
-            AutoIntegrator_rtrim(ver);
+            try
+            {
+                ver = AutoIntegrator_exec(folder_path + "/ModIntegrator.exe version");
+                AutoIntegrator_rtrim(ver);
+            }
+            catch (const std::runtime_error& err)
+            {
+                Output::send<LogLevel::Error>(L"Failed to execute ModIntegrator.exe: " + converter.from_bytes(err.what()) + L"\n");
+                throw;
+            }
+            catch (...)
+            {
+                Output::send<LogLevel::Error>(L"Failed to execute ModIntegrator.exe for an unknown reason\n");
+                throw;
+            }
         }
 
         std::wstring ver_wide_cpp = converter.from_bytes(ver);

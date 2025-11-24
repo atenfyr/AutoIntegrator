@@ -337,11 +337,6 @@ public:
     {
     }
 
-    auto on_program_start() -> void override
-    {
-
-    }
-
     auto on_update() -> void override
     {
 

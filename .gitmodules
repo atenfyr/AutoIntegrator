@@ -1,3 +1,6 @@
 [submodule "AutoIntegrator/cpp-httplib"]
 	path = AutoIntegrator/cpp-httplib
 	url = https://github.com/yhirose/cpp-httplib.git
+[submodule "RE-UE4SS"]
+	path = RE-UE4SS
+	url = https://github.com/atenfyr/RE-UE4SS.git

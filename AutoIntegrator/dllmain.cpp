@@ -127,6 +127,15 @@ std::string AutoIntegrator_exec(std::string cmd_cpp) {
     return output;
 }
 
+bool AutoIntegrator_check_linux()
+{
+    HMODULE hntdll = GetModuleHandle(L"ntdll.dll");
+    if (!hntdll) return true; // not NT, so we assume on Linux
+
+    void* pwine_get_version = (void*)GetProcAddress(hntdll, "wine_get_version");
+    return pwine_get_version != NULL; // true if running on wine (Linux), false otherwise (Windows)
+}
+
 bool AutoIntegrator_download_exe(std::string folder_path, std::string ver)
 {
     Output::send<LogLevel::Normal>(L"Checking for updates to AstroModIntegrator Classic...\n");
@@ -173,12 +182,13 @@ bool AutoIntegrator_download_exe(std::string folder_path, std::string ver)
     if (success1) Output::send<LogLevel::Verbose>(L"Latest version of AstroModIntegrator Classic: v" + converter.from_bytes(latest_ver) + L"\n");
 
     bool success2 = false;
+    bool isLinux = AutoIntegrator_check_linux();
     try
     {
         if (success1 && latest_ver != ver) // did we successfully get the latest version, and do we actually need to update?
         {
             Output::send<LogLevel::Verbose>(L"Updating AstroModIntegrator Classic...\n");
-            if (auto res = cli.Get("/atenfyr/AstroModLoader-Classic/releases/download/v" + latest_ver + "/ModIntegrator-win-x64.exe", headers))
+            if (auto res = cli.Get("/atenfyr/AstroModLoader-Classic/releases/download/v" + latest_ver + (isLinux ? "/ModIntegrator-linux-x64" : "/ModIntegrator-win-x64.exe"), headers))
             {
                 // follow redirects
                 while (res->status >= 300 && res->status < 400)
@@ -203,10 +213,10 @@ bool AutoIntegrator_download_exe(std::string folder_path, std::string ver)
                 // download file
                 if (res->status == httplib::StatusCode::OK_200)
                 {
-                    std::ofstream fs(folder_path + "/ModIntegrator.exe", std::ios::out | std::ios::binary);
+                    std::ofstream fs(folder_path + (isLinux ? "/ModIntegrator" : "/ModIntegrator.exe"), std::ios::out | std::ios::binary);
                     fs.write((res->body).data(), (res->body).size());
                     fs.close();
-                    Output::send<LogLevel::Normal>(L"Successfully downloaded ModIntegrator.exe\n");
+                    Output::send<LogLevel::Normal>(L"Successfully downloaded ModIntegrator\n");
                     success2 = true;
                 }
                 else
@@ -251,7 +261,7 @@ void AutoIntegrator_integrate(std::string paksPath1, std::string paksPath2, std:
     std::wstring game_exec_dir = UE4SSProgram::get_program().get_game_executable_directory();
     std::string game_exec_dir_narrow = converter.to_bytes(game_exec_dir);
 
-    std::string finalCmd = folder_path + "/ModIntegrator.exe [ \"" + paksPath1 + "\" \"" + paksPath2 + "\" ] \"" + game_exec_dir_narrow + "/../../Content/Paks\"";
+    std::string finalCmd = folder_path + "/ModIntegrator [ \"" + paksPath1 + "\" \"" + paksPath2 + "\" ] \"" + game_exec_dir_narrow + "/../../Content/Paks\"";
     if (!outPath.empty() && outPath != "default") finalCmd += " \"" + outPath + "\"";
     std::wstring finalCmd_wide = converter.from_bytes(finalCmd) + L"\n";
     Output::send<LogLevel::Verbose>(finalCmd_wide);
@@ -271,6 +281,14 @@ public:
 
     AutoIntegrator() : CppUserModBase()
     {
+        ModName = STR("AutoIntegrator");
+        ModVersion = STR("1.0.0");
+        ModDescription = STR("atenfyr's AutoIntegrator, for loading classic AstroModLoader mods through UE4SS");
+        ModAuthors = STR("atenfyr");
+        // Do not change this unless you want to target a UE4SS version
+        // other than the one you're currently building with somehow.
+        //ModIntendedSDKVersion = STR("2.6");
+
         std::wstring_convert<std::codecvt_utf8_utf16<wchar_t>> converter;
 
         folder_path = AutoIntegrator_get_dll_path() + "/../..";
@@ -293,7 +311,7 @@ public:
         // init
         try
         {
-            ver = AutoIntegrator_exec(folder_path + "/ModIntegrator.exe version");
+            ver = AutoIntegrator_exec(folder_path + "/ModIntegrator version");
             AutoIntegrator_rtrim(ver);
         }
         catch (const std::runtime_error& err)
@@ -304,7 +322,7 @@ public:
             // unless we can't auto-update...
             if (!autoUpdate)
             {
-                Output::send<LogLevel::Error>(L"Failed to execute ModIntegrator.exe: " + converter.from_bytes(err.what()) + L"\n");
+                Output::send<LogLevel::Error>(L"Failed to execute ModIntegrator: " + converter.from_bytes(err.what()) + L"\n");
                 throw;
             }
         }
@@ -316,7 +334,7 @@ public:
             // unless we can't auto-update...
             if (!autoUpdate)
             {
-                Output::send<LogLevel::Error>(L"Failed to execute ModIntegrator.exe for an unknown reason\n");
+                Output::send<LogLevel::Error>(L"Failed to execute ModIntegrator for an unknown reason\n");
                 throw;
             }
         }
@@ -328,17 +346,17 @@ public:
             // re-fetch version in case we auto-updated
             try
             {
-                ver = AutoIntegrator_exec(folder_path + "/ModIntegrator.exe version");
+                ver = AutoIntegrator_exec(folder_path + "/ModIntegrator version");
                 AutoIntegrator_rtrim(ver);
             }
             catch (const std::runtime_error& err)
             {
-                Output::send<LogLevel::Error>(L"Failed to execute ModIntegrator.exe: " + converter.from_bytes(err.what()) + L"\n");
+                Output::send<LogLevel::Error>(L"Failed to execute ModIntegrator: " + converter.from_bytes(err.what()) + L"\n");
                 throw;
             }
             catch (...)
             {
-                Output::send<LogLevel::Error>(L"Failed to execute ModIntegrator.exe for an unknown reason\n");
+                Output::send<LogLevel::Error>(L"Failed to execute ModIntegrator for an unknown reason\n");
                 throw;
             }
         }
@@ -346,17 +364,9 @@ public:
         std::wstring ver_wide_cpp = converter.from_bytes(ver);
         const wchar_t* ver_wide = ver_wide_cpp.c_str();
 
-        ModName = STR("AutoIntegrator");
-        ModVersion = ver_wide;
-        ModDescription = STR("atenfyr's AutoIntegrator, for loading classic AstroModLoader mods through UE4SS");
-        ModAuthors = STR("atenfyr");
-        // Do not change this unless you want to target a UE4SS version
-        // other than the one you're currently building with somehow.
-        //ModIntendedSDKVersion = STR("2.6");
-
-        std::wstring log_out_start = L"Initializing AutoIntegrator v";
+        std::wstring log_out_start = L"Initializing AutoIntegrator v" + ModVersion + L" (";
         log_out_start += ver_wide_cpp;
-        log_out_start += L" by atenfyr\n";
+        log_out_start += L") by atenfyr\n";
         Output::send<LogLevel::Normal>(log_out_start);
 
         std::wstring log_out_2 = L"Folder path: ";

@@ -1,5 +1,5 @@
 default
-default
+LogicMods
 true
 
 This is the AutoIntegrator config. Modify the first 3 lines as needed. DON'T MODIFY THIS FILE UNLESS YOU KNOW WHAT YOU'RE DOING!

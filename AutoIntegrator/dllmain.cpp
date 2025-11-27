@@ -244,6 +244,81 @@ bool AutoIntegrator_download_exe(std::string folder_path, std::string ver)
     return success2;
 }
 
+std::wstring AutoIntegrator_GetFinalPathFromHandle(HANDLE hFile)
+{
+    DWORD size = GetFinalPathNameByHandleW(hFile, nullptr, 0, FILE_NAME_NORMALIZED);
+
+    if (size == 0)
+    {
+        return L"";
+    }
+
+    std::vector<wchar_t> buffer(size);
+    DWORD result = GetFinalPathNameByHandleW(
+        hFile,
+        buffer.data(),
+        size,
+        FILE_NAME_NORMALIZED
+    );
+
+    if (result == 0 || result >= size)
+    {
+        return L"";
+    }
+
+    std::wstring path = buffer.data();
+
+    if (path.substr(0, 4) == L"\\\\?\\")
+    {
+        if (path.substr(4, 4) == L"UNC\\")
+        {
+            path = L"\\\\" + path.substr(8);
+        }
+        else
+        {
+            path = path.substr(4);
+        }
+    }
+
+    return path;
+}
+
+std::wstring AutoIntegrator_PassPathThroughShimloader(std::wstring oldPath)
+{
+    HANDLE hFile = CreateFileW(
+        oldPath.c_str(),
+        0,
+        FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE,
+        nullptr,
+        OPEN_EXISTING,
+        FILE_FLAG_BACKUP_SEMANTICS,
+        nullptr
+    );
+
+    if (hFile != INVALID_HANDLE_VALUE && hFile != nullptr)
+    {
+        std::wstring outVal = AutoIntegrator_GetFinalPathFromHandle(hFile);
+        CloseHandle(hFile);
+        if (outVal.empty()) outVal = oldPath;
+
+        Output::send<LogLevel::Verbose>(oldPath + L" => " + outVal + L"\n");
+        return outVal;
+    }
+
+    return oldPath;
+}
+
+std::string AutoIntegrator_PassPathThroughShimloader(std::string oldPath)
+{
+    std::wstring_convert<std::codecvt_utf8_utf16<wchar_t>> converter;
+    return converter.to_bytes(AutoIntegrator_PassPathThroughShimloader(converter.from_bytes(oldPath)));
+}
+
+std::string AutoIntegrator_GetExecutablePath(std::string folderPath)
+{
+    return AutoIntegrator_PassPathThroughShimloader(folderPath + "/ModIntegrator" + (AutoIntegrator_check_linux() ? "" : ".exe"));
+}
+
 void AutoIntegrator_integrate(std::string paksPath1, std::string paksPath2, std::string folder_path, std::string outPath)
 {
     std::wstring_convert<std::codecvt_utf8_utf16<wchar_t>> converter;
@@ -261,8 +336,8 @@ void AutoIntegrator_integrate(std::string paksPath1, std::string paksPath2, std:
     std::wstring game_exec_dir = UE4SSProgram::get_program().get_game_executable_directory();
     std::string game_exec_dir_narrow = converter.to_bytes(game_exec_dir);
 
-    std::string finalCmd = folder_path + "/ModIntegrator [ \"" + paksPath1 + "\" \"" + paksPath2 + "\" ] \"" + game_exec_dir_narrow + "/../../Content/Paks\"";
-    if (!outPath.empty() && outPath != "default") finalCmd += " \"" + outPath + "\"";
+    std::string finalCmd = AutoIntegrator_GetExecutablePath(folder_path) + " [ \"" + AutoIntegrator_PassPathThroughShimloader(paksPath1) + "\" \"" + AutoIntegrator_PassPathThroughShimloader(paksPath2) + "\" ] \"" + (game_exec_dir_narrow + "/../../Content/Paks") + "\"";
+    if (!outPath.empty() && outPath != "default") finalCmd += " \"" + AutoIntegrator_PassPathThroughShimloader(outPath) + "\"";
     std::wstring finalCmd_wide = converter.from_bytes(finalCmd) + L"\n";
     Output::send<LogLevel::Verbose>(finalCmd_wide);
 
@@ -311,7 +386,7 @@ public:
         // init
         try
         {
-            ver = AutoIntegrator_exec(folder_path + "/ModIntegrator version");
+            ver = AutoIntegrator_exec(AutoIntegrator_GetExecutablePath(folder_path) + " version");
             AutoIntegrator_rtrim(ver);
         }
         catch (const std::runtime_error& err)
@@ -346,7 +421,7 @@ public:
             // re-fetch version in case we auto-updated
             try
             {
-                ver = AutoIntegrator_exec(folder_path + "/ModIntegrator version");
+                ver = AutoIntegrator_exec(AutoIntegrator_GetExecutablePath(folder_path) + " version");
                 AutoIntegrator_rtrim(ver);
             }
             catch (const std::runtime_error& err)

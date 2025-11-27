@@ -1,6 +1,6 @@
 {
     "name": "AutoIntegrator",
-    "version_number": "1.0.0",
+    "version_number": "1.0.1",
     "author": "atenfyr",
     "website_url": "https://github.com/atenfyr/AutoIntegrator",
     "description": "Load AstroModLoader mods through UE4SS",

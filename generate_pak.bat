@@ -5,6 +5,13 @@ IF %ERRORLEVEL% NEQ 0 (
     goto :done
 )
 
+copy /y "./LICENSE" "./out/LICENSE"
+copy /y "./README.md" "./out/README.md"
+copy /y "./NOTICE.md" "./out/NOTICE.md"
+copy /y "./LICENSE" "./out/mod/LICENSE"
+copy /y "./README.md" "./out/mod/README.md"
+copy /y "./NOTICE.md" "./out/mod/NOTICE.md"
+
 del /S /Q "./pak/UE4SS"
 xcopy /s /e /y "./out/mod" "./pak/UE4SS"
 
@@ -16,7 +23,7 @@ move /y ".\pak\UE4SS\config.txt" ".\pak\UE4SS\config2.txt"
   )
 )
 
-repak pack --version V4 --compression Zlib "./pak" "./out/PAK-FOR-AML-CLASSIC/000-AutoIntegratorForAML-1.0.1_P.pak"
+repak pack --version V4 --compression Zlib "./pak" "./out/PAK-FOR-AML-CLASSIC/000-AutoIntegratorForAML-1.0.2_P.pak"
 echo.
 echo All done!
 

@@ -4,7 +4,7 @@
     "mod_id": "AutoIntegratorForAML",
     "author": "atenfyr",
     "description": "Integrates .pak mods on game launch. This mod should only be installed through AstroModLoader Classic",
-    "version": "1.0.1",
+    "version": "1.0.2",
     "sync": "client",
     "homepage": "https://github.com/atenfyr/AutoIntegrator",
     "enable_ue4ss": true

@@ -22,13 +22,15 @@ This mod is not supported by astro_modloader (the Rust mod loader), which does n
 If this mod is installed through UE4SS directly, you can configure this mod by editing the "config.txt" file within the directory of the mod. The default "config.txt" file is as follows:
 ```
 default
-default
+LogicMods
+true
 true
 
 This is the AutoIntegrator config. Modify the first 3 lines as needed. DON'T MODIFY THIS FILE UNLESS YOU KNOW WHAT YOU'RE DOING!
 Line 1: path to folder containing mod paks. "default" = %LOCALAPPDATA\Astro\Saved\Paks; otherwise, an absolute path. LogicMods folder is also automatically integrated
 Line 2: folder to output integrated pak to. "default" = Line 1; "LogicMods" = the LogicMods folder; otherwise, an absolute path
 Line 3: whether or not to auto-update ModIntegrator.exe. "true" = yes. "false" = no
+Line 4: whether or not to override engine version and signatures for Astroneer. "true" = yes. "false" = no
 All other lines are treated as comments.
 ```
 

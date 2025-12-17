@@ -353,6 +353,7 @@ class AutoIntegrator : public RC::CppUserModBase
 public:
     std::string ver;
     std::string folder_path;
+    bool overrideEngineVersionAndSignatures;
 
     AutoIntegrator() : CppUserModBase()
     {
@@ -360,9 +361,6 @@ public:
         ModVersion = STR("1.0.2");
         ModDescription = STR("atenfyr's AutoIntegrator, for loading classic AstroModLoader mods through UE4SS");
         ModAuthors = STR("atenfyr");
-        // Do not change this unless you want to target a UE4SS version
-        // other than the one you're currently building with somehow.
-        //ModIntendedSDKVersion = STR("2.6");
 
         std::wstring_convert<std::codecvt_utf8_utf16<wchar_t>> converter;
 
@@ -372,16 +370,70 @@ public:
         std::string paksPath;
         std::string outPath;
         std::string autoUpdateStr;
+        std::string overrideEngineVersionAndSignaturesStr;
         std::ifstream in(folder_path + "/config.txt", std::ios_base::in);
         std::getline(in, paksPath);
         std::getline(in, outPath);
         std::getline(in, autoUpdateStr);
+        std::getline(in, overrideEngineVersionAndSignaturesStr);
         in.close();
 
         AutoIntegrator_rtrim(paksPath);
         AutoIntegrator_rtrim(outPath);
         AutoIntegrator_rtrim(autoUpdateStr);
+        AutoIntegrator_rtrim(overrideEngineVersionAndSignaturesStr);
         bool autoUpdate = !(autoUpdateStr == "false");
+        overrideEngineVersionAndSignatures = !(overrideEngineVersionAndSignaturesStr == "false");
+
+        // update this code whenever any game update breaks UE4SS
+        if (overrideEngineVersionAndSignatures && !UE4SSProgram::get_program().m_has_game_specific_config)
+        {
+            Output::send<LogLevel::Normal>(L"Overriding engine version and signatures for Astroneer\n");
+
+            // get settings path
+            std::wstring workingDirectory = UE4SSProgram::get_program().get_working_directory();
+            std::filesystem::path finalSettingsPath = workingDirectory;
+            finalSettingsPath.append(UE4SSProgram::get_program().m_settings_file_name);
+
+            // edit settings file
+            std::ifstream in(finalSettingsPath, std::ios_base::in);
+            std::stringstream buffer;
+            buffer << in.rdbuf();
+            in.close();
+
+            std::string outText = buffer.str();
+            outText = std::regex_replace(outText, std::regex("MajorVersion\\s*=.*\\n"), "MajorVersion = 4\n");
+            outText = std::regex_replace(outText, std::regex("MinorVersion\\s*=.*\\n"), "MinorVersion = 27\n");
+
+            std::ofstream out(finalSettingsPath, std::ios_base::out);
+            out.write(outText.c_str(), outText.length());
+            out.close();
+
+            // reload settings
+            UE4SSProgram::get_program().settings_manager.deserialize(finalSettingsPath);
+
+            // provide signature
+            // this relies on PR https://github.com/UE4SS-RE/RE-UE4SS/pull/1111 to be merged
+            try
+            {
+                std::string signatureValue = "-- Signature produced by CorporalWill123\nfunction Register()\n    return \"FF 50 08 90 48 8B C7 83 4F 10 12 4C 8D 5C 24 70 49 8B 5B 28\"\nend\n\nfunction OnMatchFound(MatchAddress)\n    return MatchAddress - 0x173\nend\n\n";
+
+                CreateDirectoryW((UE4SSProgram::get_program().get_game_executable_directory() + L"/UE4SS_Signatures").c_str(), NULL); // ignore any error from CreateDirectoryW
+                std::ofstream fs(UE4SSProgram::get_program().get_game_executable_directory() + L"/UE4SS_Signatures/FText_Constructor.lua", std::ios::out);
+                fs.write(signatureValue.c_str(), signatureValue.length());
+                fs.close();
+            }
+            catch (const std::runtime_error& err)
+            {
+                Output::send<LogLevel::Error>(L"Failed to create FText_Constructor.lua: " + converter.from_bytes(err.what()) + L"\n");
+                throw;
+            }
+            catch (...)
+            {
+                Output::send<LogLevel::Error>(L"Failed to create FText_Constructor.lua for an unknown reason\n");
+                throw;
+            }
+        }
 
         // init
         try
@@ -456,6 +508,7 @@ public:
 
         if (outPath == "LogicMods") outPath = logicMods_dir;
 
+        // integrate
         AutoIntegrator_integrate(paksPath, logicMods_dir, folder_path, outPath);
     }
 

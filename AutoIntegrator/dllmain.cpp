@@ -395,25 +395,51 @@ public:
             std::filesystem::path finalSettingsPath = workingDirectory;
             finalSettingsPath.append(UE4SSProgram::get_program().m_settings_file_name);
 
-            // edit settings file
-            std::ifstream in(finalSettingsPath, std::ios_base::in);
-            std::stringstream buffer;
-            buffer << in.rdbuf();
-            in.close();
+            try
+            {
+                // edit settings file
+                std::ifstream in(finalSettingsPath, std::ios_base::in);
+                std::stringstream buffer;
+                buffer << in.rdbuf();
+                in.close();
 
-            std::string outText = buffer.str();
-            outText = std::regex_replace(outText, std::regex("MajorVersion\\s*=.*\\n"), "MajorVersion = 4\n");
-            outText = std::regex_replace(outText, std::regex("MinorVersion\\s*=.*\\n"), "MinorVersion = 27\n");
+                std::string outText = buffer.str();
+                outText = std::regex_replace(outText, std::regex("MajorVersion\\s*=.*\\n"), "MajorVersion = 4\n");
+                outText = std::regex_replace(outText, std::regex("MinorVersion\\s*=.*\\n"), "MinorVersion = 27\n");
 
-            std::ofstream out(finalSettingsPath, std::ios_base::out);
-            out.write(outText.c_str(), outText.length());
-            out.close();
+                std::ofstream out(finalSettingsPath, std::ios_base::out);
+                out.write(outText.c_str(), outText.length());
+                out.close();
+            }
+            catch (const std::runtime_error& err)
+            {
+                Output::send<LogLevel::Error>(L"Failed to edit settings file with updated engine version: " + converter.from_bytes(err.what()) + L"\n");
+                throw;
+            }
+            catch (...)
+            {
+                Output::send<LogLevel::Error>(L"Failed to edit settings file with updated engine version for an unknown reason\n");
+                throw;
+            }
 
-            // reload settings
-            UE4SSProgram::get_program().settings_manager.deserialize(finalSettingsPath);
+            try
+            {
+                // reload settings
+                UE4SSProgram::get_program().settings_manager.deserialize(finalSettingsPath);
+            }
+            catch (const std::runtime_error& err)
+            {
+                Output::send<LogLevel::Error>(L"Failed to reload settings file: " + converter.from_bytes(err.what()) + L"\n");
+                throw;
+            }
+            catch (...)
+            {
+                Output::send<LogLevel::Error>(L"Failed to reload settings file for an unknown reason\n");
+                throw;
+            }
 
             // provide signature
-            // this relies on PR https://github.com/UE4SS-RE/RE-UE4SS/pull/1111 to be merged
+            // this relies on UE4SS commit d0479fd or later
             try
             {
                 std::string signatureValue = "-- Signature produced by CorporalWill123\nfunction Register()\n    return \"FF 50 08 90 48 8B C7 83 4F 10 12 4C 8D 5C 24 70 49 8B 5B 28\"\nend\n\nfunction OnMatchFound(MatchAddress)\n    return MatchAddress - 0x173\nend\n\n";

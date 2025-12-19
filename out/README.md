@@ -10,10 +10,10 @@ This is a UE4SS mod that executes [AstroModIntegrator Classic](https://github.co
 
 ## Manual Installation
 ### UE4SS
-First, install UE4SS (latest experimental, or this fork https://github.com/atenfyr/RE-UE4SS/releases, which is guaranteed to work for Astroneer). Simply drag the "mod" folder within this .zip file into the folder you are using for UE4SS mods. This is typically the "Astro\Binaries\Win64\Mods" folder within the game installation, meaning you will then have a folder at "Astro\Binaries\Win64\Mods\mod". You can then install your AstroModLoader mods into the "Astro\Content\Paks\LogicMods" directory.
+First, install UE4SS (experimental v3.0.1-788 or later: https://github.com/UE4SS-RE/RE-UE4SS/releases/download/experimental/UE4SS_v3.0.1-788-g9a20a8f.zip, or this fork https://github.com/atenfyr/RE-UE4SS/releases, which is tested to work for Astroneer). Simply drag the "mod" folder within this .zip file into the folder you are using for UE4SS mods. This is typically the "Astro\Binaries\Win64\Mods" folder within the game installation, meaning you will then have a folder at "Astro\Binaries\Win64\Mods\mod". You can then install your AstroModLoader mods into the "Astro\Content\Paks\LogicMods" directory.
 
 ### AstroModLoader Classic
-Install the "000-AutoIntegratorForAML-1.0.2_P.pak" as you would any other mod in AstroModLoader Classic. You must install UE4SS through the Settings -> "Install UE4SS..." button within AstroModLoader Classic. This solution is mutually incompatible with pure UE4SS installation, as AstroModLoader Classic takes full control of the UE4SS mod directory.
+Install the "000-AutoIntegratorForAML-1.0.2_P.pak" file as you would any other mod in AstroModLoader Classic. You must install UE4SS through the Settings -> "Install UE4SS..." button within AstroModLoader Classic to use this mod. This solution is mutually incompatible with pure UE4SS installation, as AstroModLoader Classic takes full control of the UE4SS mod directory.
 
 ### astro_modloader (Rust)
 This mod is not supported by astro_modloader (the Rust mod loader), which does not have native UE4SS integration support.
@@ -26,7 +26,7 @@ LogicMods
 true
 true
 
-This is the AutoIntegrator config. Modify the first 3 lines as needed. DON'T MODIFY THIS FILE UNLESS YOU KNOW WHAT YOU'RE DOING!
+This is the AutoIntegrator config. Modify the first 4 lines as needed. DON'T MODIFY THIS FILE UNLESS YOU KNOW WHAT YOU'RE DOING!
 Line 1: path to folder containing mod paks. "default" = %LOCALAPPDATA\Astro\Saved\Paks; otherwise, an absolute path. LogicMods folder is also automatically integrated
 Line 2: folder to output integrated pak to. "default" = Line 1; "LogicMods" = the LogicMods folder; otherwise, an absolute path
 Line 3: whether or not to auto-update ModIntegrator.exe. "true" = yes. "false" = no

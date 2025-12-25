@@ -13,7 +13,7 @@ This is a UE4SS mod that executes [AstroModIntegrator Classic](https://github.co
 First, install UE4SS (experimental v3.0.1-788 or later: https://github.com/UE4SS-RE/RE-UE4SS/releases/download/experimental/UE4SS_v3.0.1-788-g9a20a8f.zip, or this fork https://github.com/atenfyr/RE-UE4SS/releases, which is tested to work for Astroneer). Simply drag the "mod" folder within this .zip file into the folder you are using for UE4SS mods. This is typically the "Astro\Binaries\Win64\Mods" folder within the game installation, meaning you will then have a folder at "Astro\Binaries\Win64\Mods\mod". You can then install your AstroModLoader mods into the "Astro\Content\Paks\LogicMods" directory.
 
 ### AstroModLoader Classic
-Install the "000-AutoIntegratorForAML-1.0.2_P.pak" file as you would any other mod in AstroModLoader Classic. You must install UE4SS through the Settings -> "Install UE4SS..." button within AstroModLoader Classic to use this mod. This solution is mutually incompatible with pure UE4SS installation, as AstroModLoader Classic takes full control of the UE4SS mod directory.
+Install the "000-AutoIntegratorForAML-\[version\]_P.pak" file as you would any other mod in AstroModLoader Classic. You must install UE4SS through the Settings -> "Install UE4SS..." button within AstroModLoader Classic to use this mod. This solution is mutually incompatible with pure UE4SS installation, as AstroModLoader Classic takes full control of the UE4SS mod directory.
 
 ### astro_modloader (Rust)
 This mod is not supported by astro_modloader (the Rust mod loader), which does not have native UE4SS integration support.

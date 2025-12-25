@@ -319,7 +319,8 @@ std::string AutoIntegrator_GetExecutablePath(std::string folderPath)
     return AutoIntegrator_PassPathThroughShimloader(folderPath + "/ModIntegrator" + (AutoIntegrator_check_linux() ? "" : ".exe"));
 }
 
-void AutoIntegrator_integrate(std::string paksPath1, std::string paksPath2, std::string folder_path, std::string outPath)
+// returns UE4SS extracted mods path
+std::string AutoIntegrator_integrate(std::string paksPath1, std::string paksPath2, std::string folder_path, std::string outPath)
 {
     std::wstring_convert<std::codecvt_utf8_utf16<wchar_t>> converter;
 
@@ -337,7 +338,19 @@ void AutoIntegrator_integrate(std::string paksPath1, std::string paksPath2, std:
     std::string game_exec_dir_narrow = converter.to_bytes(game_exec_dir);
 
     std::string finalCmd = AutoIntegrator_GetExecutablePath(folder_path) + " [ \"" + AutoIntegrator_PassPathThroughShimloader(paksPath1) + "\" \"" + AutoIntegrator_PassPathThroughShimloader(paksPath2) + "\" ] \"" + (game_exec_dir_narrow + "/../../Content/Paks") + "\"";
-    if (!outPath.empty() && outPath != "default") finalCmd += " \"" + AutoIntegrator_PassPathThroughShimloader(outPath) + "\"";
+    
+    // outputFolder
+    if (outPath.empty() || outPath == "default") outPath = paksPath1;
+    outPath = AutoIntegrator_PassPathThroughShimloader(outPath);
+    finalCmd += " \"" + outPath + "\"";
+
+    // mountPoint
+    finalCmd += " ../../../";
+
+    // extractLua
+    finalCmd += " true";
+
+    // execute the integrator
     std::wstring finalCmd_wide = converter.from_bytes(finalCmd) + L"\n";
     Output::send<LogLevel::Verbose>(finalCmd_wide);
 
@@ -346,6 +359,8 @@ void AutoIntegrator_integrate(std::string paksPath1, std::string paksPath2, std:
     integrator_out += "\n";
     std::wstring integrator_out_wide = converter.from_bytes(integrator_out);
     Output::send<LogLevel::Normal>(integrator_out_wide);
+
+    return outPath + "/UE4SS";
 }
 
 class AutoIntegrator : public RC::CppUserModBase
@@ -358,9 +373,18 @@ public:
     AutoIntegrator() : CppUserModBase()
     {
         ModName = STR("AutoIntegrator");
-        ModVersion = STR("1.0.2");
+        ModVersion = STR("1.0.3");
         ModDescription = STR("atenfyr's AutoIntegrator, for loading classic AstroModLoader mods through UE4SS");
         ModAuthors = STR("atenfyr");
+
+        // if unreal is already initialized (i.e., hot reload) then don't integrate again
+        if (Unreal::UnrealInitializer::StaticStorage::bIsInitialized)
+        {
+            Output::send<LogLevel::Normal>(L"Hot reload detected, skipping integration\n");
+            return;
+        }
+
+        UE4SSProgram& ue4ssProgram = UE4SSProgram::get_program();
 
         std::wstring_convert<std::codecvt_utf8_utf16<wchar_t>> converter;
 
@@ -384,82 +408,6 @@ public:
         AutoIntegrator_rtrim(overrideEngineVersionAndSignaturesStr);
         bool autoUpdate = !(autoUpdateStr == "false");
         overrideEngineVersionAndSignatures = !(overrideEngineVersionAndSignaturesStr == "false");
-
-        // update this code whenever any game update breaks UE4SS
-        if (overrideEngineVersionAndSignatures && !UE4SSProgram::get_program().m_has_game_specific_config)
-        {
-            Output::send<LogLevel::Normal>(L"Overriding engine version and signatures for Astroneer\n");
-
-            // get settings path
-            std::wstring workingDirectory = UE4SSProgram::get_program().get_working_directory();
-            std::filesystem::path finalSettingsPath = workingDirectory;
-            finalSettingsPath.append(UE4SSProgram::get_program().m_settings_file_name);
-
-            try
-            {
-                // edit settings file
-                std::ifstream in(finalSettingsPath, std::ios_base::in);
-                std::stringstream buffer;
-                buffer << in.rdbuf();
-                in.close();
-
-                std::string outText = buffer.str();
-                outText = std::regex_replace(outText, std::regex("MajorVersion\\s*=.*\\n"), "MajorVersion = 4\n");
-                outText = std::regex_replace(outText, std::regex("MinorVersion\\s*=.*\\n"), "MinorVersion = 27\n");
-
-                std::ofstream out(finalSettingsPath, std::ios_base::out);
-                out.write(outText.c_str(), outText.length());
-                out.close();
-            }
-            catch (const std::runtime_error& err)
-            {
-                Output::send<LogLevel::Error>(L"Failed to edit settings file with updated engine version: " + converter.from_bytes(err.what()) + L"\n");
-                throw;
-            }
-            catch (...)
-            {
-                Output::send<LogLevel::Error>(L"Failed to edit settings file with updated engine version for an unknown reason\n");
-                throw;
-            }
-
-            try
-            {
-                // reload settings
-                UE4SSProgram::get_program().settings_manager.deserialize(finalSettingsPath);
-            }
-            catch (const std::runtime_error& err)
-            {
-                Output::send<LogLevel::Error>(L"Failed to reload settings file: " + converter.from_bytes(err.what()) + L"\n");
-                throw;
-            }
-            catch (...)
-            {
-                Output::send<LogLevel::Error>(L"Failed to reload settings file for an unknown reason\n");
-                throw;
-            }
-
-            // provide signature
-            // this relies on UE4SS commit d0479fd or later
-            try
-            {
-                std::string signatureValue = "-- Signature produced by CorporalWill123\nfunction Register()\n    return \"FF 50 08 90 48 8B C7 83 4F 10 12 4C 8D 5C 24 70 49 8B 5B 28\"\nend\n\nfunction OnMatchFound(MatchAddress)\n    return MatchAddress - 0x173\nend\n\n";
-
-                CreateDirectoryW((UE4SSProgram::get_program().get_game_executable_directory() + L"/UE4SS_Signatures").c_str(), NULL); // ignore any error from CreateDirectoryW
-                std::ofstream fs(UE4SSProgram::get_program().get_game_executable_directory() + L"/UE4SS_Signatures/FText_Constructor.lua", std::ios::out);
-                fs.write(signatureValue.c_str(), signatureValue.length());
-                fs.close();
-            }
-            catch (const std::runtime_error& err)
-            {
-                Output::send<LogLevel::Error>(L"Failed to create FText_Constructor.lua: " + converter.from_bytes(err.what()) + L"\n");
-                throw;
-            }
-            catch (...)
-            {
-                Output::send<LogLevel::Error>(L"Failed to create FText_Constructor.lua for an unknown reason\n");
-                throw;
-            }
-        }
 
         // init
         try
@@ -527,7 +475,7 @@ public:
         log_out_2 += L"\n";
         Output::send<LogLevel::Verbose>(log_out_2);
 
-        std::wstring logicMods_dir_wide = UE4SSProgram::get_program().get_game_executable_directory();
+        std::wstring logicMods_dir_wide = ue4ssProgram.get_game_executable_directory();
         std::string logicMods_dir = converter.to_bytes(logicMods_dir_wide);
         logicMods_dir += "/../../Content/Paks/LogicMods";
         AutoIntegrator_rtrim(logicMods_dir);
@@ -535,7 +483,174 @@ public:
         if (outPath == "LogicMods") outPath = logicMods_dir;
 
         // integrate
-        AutoIntegrator_integrate(paksPath, logicMods_dir, folder_path, outPath);
+        std::string newModsDirectory = AutoIntegrator_integrate(paksPath, logicMods_dir, folder_path, outPath);
+
+        // delete all folders named "shared" except for the one under newModsDirectory
+        // unless: newModsDirectory doesn't exist, then we keep the current shared folder unchanged
+        if (std::filesystem::is_directory(newModsDirectory))
+        {
+            for (std::filesystem::path this_mods_directory : ue4ssProgram.get_mods_directories())
+            {
+                if (AutoIntegrator_PassPathThroughShimloader(this_mods_directory) == AutoIntegrator_PassPathThroughShimloader(converter.from_bytes(newModsDirectory))) continue;
+                std::filesystem::path pathToDelete = this_mods_directory / "shared";
+
+                std::error_code errorCode;
+                std::filesystem::remove_all(pathToDelete, errorCode);
+                if (!static_cast<bool>(errorCode) && !errorCode.message().contains("successfully")) // seems to always want to print even when succeeded... only print Normal not Error just in case
+                {
+                    const std::wstring pathToDeleteW = pathToDelete;
+                    Output::send<LogLevel::Normal>(L"Failed to delete directory \"" + pathToDeleteW + L"\": " + converter.from_bytes(errorCode.message()) + L"\n");
+                }
+            }
+
+            // move mods_directory shared folder to main mods directory
+            std::error_code errorCode;
+            std::filesystem::rename(newModsDirectory + "/shared", ue4ssProgram.get_mods_directories()[0] / "shared", errorCode);
+            if (!static_cast<bool>(errorCode) && !errorCode.message().contains("successfully")) // seems to always want to print even when succeeded... only print Normal not Error just in case
+            {
+                Output::send<LogLevel::Normal>(L"Failed to rename directory \"" + converter.from_bytes(newModsDirectory) + L"/shared\": " + converter.from_bytes(errorCode.message()) + L"\n");
+            }
+        }
+
+        // update this code whenever any game update breaks UE4SS
+        bool restartGame = 0;
+        if (overrideEngineVersionAndSignatures && !ue4ssProgram.m_has_game_specific_config)
+        {
+            Output::send<LogLevel::Normal>(L"Overriding engine version and signatures for Astroneer\n");
+
+            // get settings path
+            std::wstring workingDirectory = ue4ssProgram.get_working_directory();
+            std::filesystem::path finalSettingsPath = workingDirectory;
+            finalSettingsPath.append(ue4ssProgram.m_settings_file_name);
+
+            try
+            {
+                // edit settings file
+                std::ifstream in(finalSettingsPath, std::ios_base::in);
+                std::stringstream buffer;
+                buffer << in.rdbuf();
+                in.close();
+
+                std::string outText = buffer.str();
+                outText = std::regex_replace(outText, std::regex("MajorVersion\\s*=.*\\n"), "MajorVersion = 4\n");
+                outText = std::regex_replace(outText, std::regex("MinorVersion\\s*=.*\\n"), "MinorVersion = 27\n");
+
+                std::string outTextBefore = outText;
+                if (outText.contains("; AMLC"))
+                {
+                    outText = std::regex_replace(outText, std::regex("; AMLC\\s*?\\n\\+ModsFolderPaths.*?\\n"), "; AMLC\n+ModsFolderPaths = " + newModsDirectory + "\n");
+                }
+                else
+                {
+                    outText = std::regex_replace(outText, std::regex("\\[General\\]\\s*?\\n"), "; AMLC\n+ModsFolderPaths = " + newModsDirectory + "\n\n[General]\n");
+                }
+                if (outText != outTextBefore) restartGame = 1;
+
+                std::ofstream out(finalSettingsPath, std::ios_base::out);
+                out.write(outText.c_str(), outText.length());
+                out.close();
+            }
+            catch (const std::runtime_error& err)
+            {
+                Output::send<LogLevel::Error>(L"Failed to edit settings file with updated engine version: " + converter.from_bytes(err.what()) + L"\n");
+                throw;
+            }
+            catch (...)
+            {
+                Output::send<LogLevel::Error>(L"Failed to edit settings file with updated engine version for an unknown reason\n");
+                throw;
+            }
+
+            try
+            {
+                // reload settings
+                ue4ssProgram.settings_manager.deserialize(finalSettingsPath);
+            }
+            catch (const std::runtime_error& err)
+            {
+                Output::send<LogLevel::Error>(L"Failed to reload settings file: " + converter.from_bytes(err.what()) + L"\n");
+                throw;
+            }
+            catch (...)
+            {
+                Output::send<LogLevel::Error>(L"Failed to reload settings file for an unknown reason\n");
+                throw;
+            }
+
+            // provide signature
+            // this relies on UE4SS commit d0479fd or later
+            try
+            {
+                std::string signatureValue = "-- Signature produced by CorporalWill123\nfunction Register()\n    return \"FF 50 08 90 48 8B C7 83 4F 10 12 4C 8D 5C 24 70 49 8B 5B 28\"\nend\n\nfunction OnMatchFound(MatchAddress)\n    return MatchAddress - 0x173\nend\n\n";
+
+                CreateDirectoryW((ue4ssProgram.get_working_directory() + L"/UE4SS_Signatures").c_str(), NULL); // ignore any error from CreateDirectoryW
+                std::ofstream fs(ue4ssProgram.get_working_directory() + L"/UE4SS_Signatures/FText_Constructor.lua", std::ios::out);
+                fs.write(signatureValue.c_str(), signatureValue.length());
+                fs.close();
+            }
+            catch (const std::runtime_error& err)
+            {
+                Output::send<LogLevel::Error>(L"Failed to create FText_Constructor.lua: " + converter.from_bytes(err.what()) + L"\n");
+                throw;
+            }
+            catch (...)
+            {
+                Output::send<LogLevel::Error>(L"Failed to create FText_Constructor.lua for an unknown reason\n");
+                throw;
+            }
+        }
+
+        // restart game if need
+        int nArgs = 0;
+        LPWSTR* argv = CommandLineToArgvW(GetCommandLineW(), &nArgs);
+        for (int i = 0; i < nArgs; i++)
+        {
+            std::wstring argument = argv[i];
+            if (argument == L"--AutoIntegratorReboot")
+            {
+                Output::send<LogLevel::Normal>(L"Forcing restartGame = 1\n");
+                restartGame = 1;
+            }
+            if (argument == L"--AutoIntegratorNoReboot")
+            {
+                Output::send<LogLevel::Normal>(L"Forcing restartGame = 0\n");
+                restartGame = 0;
+            }
+        }
+        LocalFree(argv);
+
+        if (restartGame)
+        {
+            Output::send<LogLevel::Normal>(L"Restarting game\n");
+
+            try
+            {
+                wchar_t exe_path_buffer[1024];
+                GetModuleFileNameW(GetModuleHandle(nullptr), exe_path_buffer, 1023);
+                std::wstring game_exe_path = exe_path_buffer;
+                ShellExecute(
+                    NULL,
+                    L"open",
+                    game_exe_path.c_str(),
+                    L"--AutoIntegratorNoReboot",
+                    NULL,
+                    SW_SHOWNORMAL
+                );
+            }
+            catch (const std::runtime_error& err)
+            {
+                Output::send<LogLevel::Error>(L"Failed to launch new instance of the game: " + converter.from_bytes(err.what()) + L"\n");
+                Output::send<LogLevel::Error>(L"Please restart the game manually\n");
+            }
+            catch (...)
+            {
+                Output::send<LogLevel::Error>(L"Failed to launch new instance of the game for an unknown reason\n");
+                Output::send<LogLevel::Error>(L"Please restart the game manually\n");
+            }
+
+            // close game
+            std::exit(0);
+        }
     }
 
     ~AutoIntegrator() override

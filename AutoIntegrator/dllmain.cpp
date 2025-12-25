@@ -319,6 +319,7 @@ std::string AutoIntegrator_GetExecutablePath(std::string folderPath)
     return AutoIntegrator_PassPathThroughShimloader(folderPath + "/ModIntegrator" + (AutoIntegrator_check_linux() ? "" : ".exe"));
 }
 
+bool AutoIntegrator_modsChanged = 0;
 // returns UE4SS extracted mods path
 std::string AutoIntegrator_integrate(std::string paksPath1, std::string paksPath2, std::string folder_path, std::string outPath)
 {
@@ -350,6 +351,30 @@ std::string AutoIntegrator_integrate(std::string paksPath1, std::string paksPath
     // extractLua
     finalCmd += " true";
 
+    // check if mods.txt existed before
+    bool modsTxtExistedBefore = 1;
+    std::string modsTxtBefore = "";
+    try
+    {
+        std::ifstream in(outPath + "/UE4SS/mods.txt", std::ios_base::in);
+        std::stringstream buffer;
+        buffer << in.rdbuf();
+        in.close();
+        modsTxtBefore = buffer.str();
+    }
+    catch(...)
+    {
+        modsTxtExistedBefore = 0;
+    }
+    try
+    {
+        if (!std::filesystem::exists(outPath + "/UE4SS/mods.txt")) modsTxtExistedBefore = 0;
+    }
+    catch (...)
+    {
+        modsTxtExistedBefore = 0;
+    }
+
     // execute the integrator
     std::wstring finalCmd_wide = converter.from_bytes(finalCmd) + L"\n";
     Output::send<LogLevel::Verbose>(finalCmd_wide);
@@ -359,6 +384,35 @@ std::string AutoIntegrator_integrate(std::string paksPath1, std::string paksPath
     integrator_out += "\n";
     std::wstring integrator_out_wide = converter.from_bytes(integrator_out);
     Output::send<LogLevel::Normal>(integrator_out_wide);
+
+    // check after
+    bool modsTxtExistedAfter = 1;
+    std::string modsTxtAfter = "";
+    try
+    {
+        std::ifstream in(outPath + "/UE4SS/mods.txt", std::ios_base::in);
+        std::stringstream buffer;
+        buffer << in.rdbuf();
+        in.close();
+        modsTxtAfter = buffer.str();
+    }
+    catch (...)
+    {
+        modsTxtExistedAfter = 0;
+    }
+    try
+    {
+        if (!std::filesystem::exists(outPath + "/UE4SS/mods.txt")) modsTxtExistedAfter = 0;
+    }
+    catch (...)
+    {
+        modsTxtExistedAfter = 0;
+    }
+
+    if (modsTxtExistedBefore && modsTxtExistedAfter && modsTxtBefore != modsTxtAfter) AutoIntegrator_modsChanged = 1; // if the mods.txt text changed (a new mod was added), we need to restart
+    else if (modsTxtExistedBefore && !modsTxtExistedAfter) AutoIntegrator_modsChanged = 1; // if before it existed, and now it doesn't, we need to restart
+    else if (!modsTxtExistedBefore && modsTxtExistedAfter) AutoIntegrator_modsChanged = 1; // if before it didn't exist, and now it does, we need to restart
+    else if (!modsTxtExistedBefore && !modsTxtExistedAfter) AutoIntegrator_modsChanged = 0; // if didn't exist before or after, then no need to restart
 
     return outPath + "/UE4SS";
 }
@@ -479,6 +533,7 @@ public:
         std::string logicMods_dir = converter.to_bytes(logicMods_dir_wide);
         logicMods_dir += "/../../Content/Paks/LogicMods";
         AutoIntegrator_rtrim(logicMods_dir);
+        CreateDirectoryW(converter.from_bytes(logicMods_dir).c_str(), NULL); // ignore any error from CreateDirectoryW
 
         if (outPath == "LogicMods") outPath = logicMods_dir;
 
@@ -601,6 +656,8 @@ public:
         }
 
         // restart game if need
+        if (AutoIntegrator_modsChanged) restartGame = 1;
+
         int nArgs = 0;
         LPWSTR* argv = CommandLineToArgvW(GetCommandLineW(), &nArgs);
         for (int i = 0; i < nArgs; i++)
@@ -614,6 +671,7 @@ public:
             if (argument == L"--AutoIntegratorNoReboot")
             {
                 Output::send<LogLevel::Normal>(L"Forcing restartGame = 0\n");
+                if (restartGame) Output::send<LogLevel::Warning>(L"restartGame was 1 before!\n");
                 restartGame = 0;
             }
         }
@@ -628,14 +686,15 @@ public:
                 wchar_t exe_path_buffer[1024];
                 GetModuleFileNameW(GetModuleHandle(nullptr), exe_path_buffer, 1023);
                 std::wstring game_exe_path = exe_path_buffer;
-                ShellExecute(
+                auto const errorCode = reinterpret_cast<INT_PTR>(ShellExecuteW(
                     NULL,
                     L"open",
                     game_exe_path.c_str(),
                     L"--AutoIntegratorNoReboot",
                     NULL,
                     SW_SHOWNORMAL
-                );
+                ));
+                if (errorCode <= 32) throw std::runtime_error(std::to_string(errorCode));
             }
             catch (const std::runtime_error& err)
             {

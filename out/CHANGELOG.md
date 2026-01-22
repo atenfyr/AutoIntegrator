@@ -1,3 +1,6 @@
+v1.0.4:
+- Added support for AMLC-style custom routines.
+
 v1.0.3:
 - Added support for AMLC-style UE4SS mods (mods with the enable_ue4ss metadata field set to true and the UE4SS mod packaged within the .pak file).
 

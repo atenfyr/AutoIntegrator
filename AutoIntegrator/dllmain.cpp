@@ -59,7 +59,7 @@ std::string AutoIntegrator_get_dll_path()
 // ALL CODE FROM THIS POINT ON IS MIT LICENSED BY ATENFYR
 // SEE THE "LICENSE" FILE FOR MORE INFORMATION
 
-std::string AutoIntegrator_exec(std::string cmd_cpp) {
+std::string AutoIntegrator_exec(std::string cmd_cpp, std::string cwd) {
     SECURITY_ATTRIBUTES sa;
     sa.nLength = sizeof(SECURITY_ATTRIBUTES);
     sa.lpSecurityDescriptor = NULL;
@@ -85,7 +85,7 @@ std::string AutoIntegrator_exec(std::string cmd_cpp) {
 
     try
     {
-        if (!CreateProcessA(NULL, cmd, NULL, NULL, TRUE, CREATE_NO_WINDOW, NULL, NULL, &si, &pi)) throw std::runtime_error("Failed to create process");
+        if (!CreateProcessA(NULL, cmd, NULL, NULL, TRUE, CREATE_NO_WINDOW, NULL, cwd.empty() ? NULL : cwd.c_str(), &si, &pi)) throw std::runtime_error("Failed to create process");
 
         CloseHandle(hWritePipe);
 
@@ -338,18 +338,25 @@ std::string AutoIntegrator_integrate(std::string paksPath1, std::string paksPath
     std::wstring game_exec_dir = UE4SSProgram::get_program().get_game_executable_directory();
     std::string game_exec_dir_narrow = converter.to_bytes(game_exec_dir);
 
-    std::string finalCmd = AutoIntegrator_GetExecutablePath(folder_path) + " [ \"" + AutoIntegrator_PassPathThroughShimloader(paksPath1) + "\" \"" + AutoIntegrator_PassPathThroughShimloader(paksPath2) + "\" ] \"" + (game_exec_dir_narrow + "/../../Content/Paks") + "\"";
+    std::string finalCmd = AutoIntegrator_GetExecutablePath(folder_path) + " -i \"" + AutoIntegrator_PassPathThroughShimloader(paksPath1) + "\" \"" + AutoIntegrator_PassPathThroughShimloader(paksPath2) + "\" -g \"" + (game_exec_dir_narrow + "/../../Content/Paks") + "\"";
     
     // outputFolder
     if (outPath.empty() || outPath == "default") outPath = paksPath1;
     outPath = AutoIntegrator_PassPathThroughShimloader(outPath);
-    finalCmd += " \"" + outPath + "\"";
-
-    // mountPoint
-    finalCmd += " ../../../";
+    finalCmd += " -o \"" + outPath + "\"";
 
     // extractLua
-    finalCmd += " true";
+    finalCmd += " --extract_lua";
+
+    // cleanLua is enabled by default
+
+    // enableCustomRoutines
+    // security of custom routines is not much of a concern here because C++ UE4SS mods already can execute arbitrary code
+    // so it's OK to always enable custom routines
+    finalCmd += " --enable_custom_routines";
+
+    // verbose
+    finalCmd += " -v";
 
     // check if mods.txt existed before
     bool modsTxtExistedBefore = 1;
@@ -379,7 +386,7 @@ std::string AutoIntegrator_integrate(std::string paksPath1, std::string paksPath
     std::wstring finalCmd_wide = converter.from_bytes(finalCmd) + L"\n";
     Output::send<LogLevel::Verbose>(finalCmd_wide);
 
-    std::string integrator_out = AutoIntegrator_exec(finalCmd.c_str());
+    std::string integrator_out = AutoIntegrator_exec(finalCmd.c_str(), AutoIntegrator_PassPathThroughShimloader(folder_path));
     AutoIntegrator_rtrim(integrator_out);
     integrator_out += "\n";
     std::wstring integrator_out_wide = converter.from_bytes(integrator_out);
@@ -427,7 +434,7 @@ public:
     AutoIntegrator() : CppUserModBase()
     {
         ModName = STR("AutoIntegrator");
-        ModVersion = STR("1.0.3");
+        ModVersion = STR("1.0.4");
         ModDescription = STR("atenfyr's AutoIntegrator, for loading classic AstroModLoader mods through UE4SS");
         ModAuthors = STR("atenfyr");
 
@@ -466,7 +473,7 @@ public:
         // init
         try
         {
-            ver = AutoIntegrator_exec(AutoIntegrator_GetExecutablePath(folder_path) + " version");
+            ver = AutoIntegrator_exec(AutoIntegrator_GetExecutablePath(folder_path) + " version", "");
             AutoIntegrator_rtrim(ver);
         }
         catch (const std::runtime_error& err)
@@ -501,7 +508,7 @@ public:
             // re-fetch version in case we auto-updated
             try
             {
-                ver = AutoIntegrator_exec(AutoIntegrator_GetExecutablePath(folder_path) + " version");
+                ver = AutoIntegrator_exec(AutoIntegrator_GetExecutablePath(folder_path) + " version", "");
                 AutoIntegrator_rtrim(ver);
             }
             catch (const std::runtime_error& err)

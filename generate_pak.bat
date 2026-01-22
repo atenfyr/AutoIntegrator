@@ -15,10 +15,10 @@ copy /y "./NOTICE.md" "./out/mod/NOTICE.md"
 del /S /Q "./pak/UE4SS"
 xcopy /s /e /y "./out/mod" "./pak/UE4SS"
 
-move /y ".\pak\UE4SS\config.txt" ".\pak\UE4SS\config2.txt"
+move /y ".\pak\UE4SS\config.txt" ".\pak\UE4SS\config_unused.txt"
 
 >".\pak\UE4SS\config.txt" (
-  for /f "usebackq delims=" %%A in (".\pak\UE4SS\config2.txt") do (
+  for /f "usebackq delims=" %%A in (".\pak\UE4SS\config_unused.txt") do (
     if "%%A" equ "LogicMods" (echo default) else (echo %%A)
   )
 )

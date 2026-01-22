@@ -2,6 +2,7 @@
 #include "cpp-httplib/httplib.h"
 #include <stdio.h>
 #include <fstream>
+#include <algorithm>
 #include <UE4SSProgram.hpp>
 #include <Mod/CppUserModBase.hpp>
 #include <DynamicOutput/DynamicOutput.hpp>
@@ -319,10 +320,24 @@ std::string AutoIntegrator_GetExecutablePath(std::string folderPath)
     return AutoIntegrator_PassPathThroughShimloader(folderPath + "/ModIntegrator" + (AutoIntegrator_check_linux() ? "" : ".exe"));
 }
 
+bool AutoIntegrator_IsSecondSubDirOfFirst(const std::filesystem::path& first, const std::filesystem::path& second) {
+    try
+    {
+        std::filesystem::path firstCanon = std::filesystem::canonical(first);
+        std::filesystem::path secondCanon = std::filesystem::canonical(second);
+        return std::mismatch(secondCanon.begin(), secondCanon.end(), firstCanon.begin(), firstCanon.end()).second == firstCanon.end();
+    }
+    catch (...) {}
+    return false;
+}
+
 bool AutoIntegrator_modsChanged = 0;
+bool AutoIntegrator_extractedLua = 0;
 // returns UE4SS extracted mods path
 std::string AutoIntegrator_integrate(std::string paksPath1, std::string paksPath2, std::string folder_path, std::string outPath)
 {
+    AutoIntegrator_extractedLua = 0;
+
     std::wstring_convert<std::codecvt_utf8_utf16<wchar_t>> converter;
 
     Output::send<LogLevel::Normal>(L"Performing integration...\n");
@@ -338,6 +353,8 @@ std::string AutoIntegrator_integrate(std::string paksPath1, std::string paksPath
     std::wstring game_exec_dir = UE4SSProgram::get_program().get_game_executable_directory();
     std::string game_exec_dir_narrow = converter.to_bytes(game_exec_dir);
 
+    std::string cwd = AutoIntegrator_PassPathThroughShimloader(folder_path);
+
     std::string finalCmd = AutoIntegrator_GetExecutablePath(folder_path) + " -i \"" + AutoIntegrator_PassPathThroughShimloader(paksPath1) + "\" \"" + AutoIntegrator_PassPathThroughShimloader(paksPath2) + "\" -g \"" + (game_exec_dir_narrow + "/../../Content/Paks") + "\"";
     
     // outputFolder
@@ -346,9 +363,15 @@ std::string AutoIntegrator_integrate(std::string paksPath1, std::string paksPath
     finalCmd += " -o \"" + outPath + "\"";
 
     // extractLua
-    finalCmd += " --extract_lua";
+    // we don't extract lua if cwd is a subdirectory of outPath
+    // (that would mean that we are ourselves are one of the UE4SS mods that we would be trying to extract)
+    if (!AutoIntegrator_IsSecondSubDirOfFirst(outPath, cwd))
+    {
+        finalCmd += " --extract_lua";
+        // cleanLua is enabled by default
 
-    // cleanLua is enabled by default
+        AutoIntegrator_extractedLua = 1;
+    }
 
     // enableCustomRoutines
     // security of custom routines is not much of a concern here because C++ UE4SS mods already can execute arbitrary code
@@ -386,7 +409,7 @@ std::string AutoIntegrator_integrate(std::string paksPath1, std::string paksPath
     std::wstring finalCmd_wide = converter.from_bytes(finalCmd) + L"\n";
     Output::send<LogLevel::Verbose>(finalCmd_wide);
 
-    std::string integrator_out = AutoIntegrator_exec(finalCmd.c_str(), AutoIntegrator_PassPathThroughShimloader(folder_path));
+    std::string integrator_out = AutoIntegrator_exec(finalCmd.c_str(), cwd);
     AutoIntegrator_rtrim(integrator_out);
     integrator_out += "\n";
     std::wstring integrator_out_wide = converter.from_bytes(integrator_out);
@@ -526,7 +549,7 @@ public:
         std::wstring ver_wide_cpp = converter.from_bytes(ver);
         const wchar_t* ver_wide = ver_wide_cpp.c_str();
 
-        std::wstring log_out_start = L"Initializing AutoIntegrator v" + ModVersion + L" (";
+        std::wstring log_out_start = L"Initializing AutoIntegrator v" + ModVersion + L" (AstroModIntegrator Classic v";
         log_out_start += ver_wide_cpp;
         log_out_start += L") by atenfyr\n";
         Output::send<LogLevel::Normal>(log_out_start);
@@ -549,7 +572,8 @@ public:
 
         // delete all folders named "shared" except for the one under newModsDirectory
         // unless: newModsDirectory doesn't exist, then we keep the current shared folder unchanged
-        if (std::filesystem::is_directory(newModsDirectory))
+        // (also, don't do this unless we actually extracted lua mods)
+        if (AutoIntegrator_extractedLua && std::filesystem::is_directory(newModsDirectory))
         {
             for (std::filesystem::path this_mods_directory : ue4ssProgram.get_mods_directories())
             {
@@ -598,13 +622,16 @@ public:
                 outText = std::regex_replace(outText, std::regex("MinorVersion\\s*=.*\\n"), "MinorVersion = 27\n");
 
                 std::string outTextBefore = outText;
-                if (outText.contains("; AMLC"))
+                if (AutoIntegrator_extractedLua) // AutoIntegrator_extractedLua is set after integration
                 {
-                    outText = std::regex_replace(outText, std::regex("; AMLC\\s*?\\n\\+ModsFolderPaths.*?\\n"), "; AMLC\n+ModsFolderPaths = " + newModsDirectory + "\n");
-                }
-                else
-                {
-                    outText = std::regex_replace(outText, std::regex("\\[General\\]\\s*?\\n"), "; AMLC\n+ModsFolderPaths = " + newModsDirectory + "\n\n[General]\n");
+                    if (outText.contains("; AMLC"))
+                    {
+                        outText = std::regex_replace(outText, std::regex("; AMLC\\s*?\\n\\+ModsFolderPaths.*?\\n"), "; AMLC\n+ModsFolderPaths = " + newModsDirectory + "\n");
+                    }
+                    else
+                    {
+                        outText = std::regex_replace(outText, std::regex("\\[General\\]\\s*?\\n"), "; AMLC\n+ModsFolderPaths = " + newModsDirectory + "\n\n[General]\n");
+                    }
                 }
                 if (outText != outTextBefore) restartGame = 1;
 

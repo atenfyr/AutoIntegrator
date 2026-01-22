@@ -23,7 +23,7 @@ move /y ".\pak\UE4SS\config.txt" ".\pak\UE4SS\config2.txt"
   )
 )
 
-repak pack --version V4 --compression Zlib "./pak" "./out/PAK-FOR-AML-CLASSIC/000-AutoIntegratorForAML-1.0.4_P.pak"
+repak pack --version V4 --compression Zlib "./pak" "./out/PAK-FOR-AMLC/000-AutoIntegratorForAMLC-1.0.4_P.pak"
 echo.
 echo All done!
 

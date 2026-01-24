@@ -1,3 +1,6 @@
+v1.0.5:
+- Further fixes for the Unreal shimloader.
+
 v1.0.4:
 - Added support for AMLC-style custom routines.
 - Disabled automatic extraction of UE4SS mods when installed as an AMLC .pak mod.

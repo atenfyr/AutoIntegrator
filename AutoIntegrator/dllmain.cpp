@@ -302,7 +302,7 @@ std::wstring AutoIntegrator_PassPathThroughShimloader(std::wstring oldPath)
         CloseHandle(hFile);
         if (outVal.empty()) outVal = oldPath;
 
-        Output::send<LogLevel::Verbose>(oldPath + L" => " + outVal + L"\n");
+        //Output::send<LogLevel::Verbose>(oldPath + L" => " + outVal + L"\n");
         return outVal;
     }
 
@@ -334,7 +334,7 @@ bool AutoIntegrator_IsSecondSubDirOfFirst(const std::filesystem::path& first, co
 bool AutoIntegrator_modsChanged = 0;
 bool AutoIntegrator_extractedLua = 0;
 // returns UE4SS extracted mods path
-std::string AutoIntegrator_integrate(std::string paksPath1, std::string paksPath2, std::string folder_path, std::string outPath)
+bool AutoIntegrator_integrate(std::string paksPath1, std::string paksPath2, std::string folder_path, std::string outPath, std::string& out_ue4ssExtractionPath, std::wstring& out_IntegratorOutput)
 {
     AutoIntegrator_extractedLua = 0;
 
@@ -362,6 +362,14 @@ std::string AutoIntegrator_integrate(std::string paksPath1, std::string paksPath
     outPath = AutoIntegrator_PassPathThroughShimloader(outPath);
     finalCmd += " -o \"" + outPath + "\"";
 
+    std::string integratorPakPath = outPath + "/999-AstroModIntegrator_P.pak";
+    // delete existing pak if we can to avoid success false positives
+    try
+    {
+        std::filesystem::remove(integratorPakPath);
+    }
+    catch (...) {}
+
     // extractLua
     // we don't extract lua if cwd is a subdirectory of outPath
     // (that would mean that we are ourselves are one of the UE4SS mods that we would be trying to extract)
@@ -380,6 +388,9 @@ std::string AutoIntegrator_integrate(std::string paksPath1, std::string paksPath
 
     // verbose
     finalCmd += " -v";
+
+    // UNCOMMENT THIS TO INTENTIONALLY CRASH THE INTEGRATOR
+    //finalCmd += " --pak_to_named_pipe AutoIntegrator_dummy";
 
     // check if mods.txt existed before
     bool modsTxtExistedBefore = 1;
@@ -415,6 +426,8 @@ std::string AutoIntegrator_integrate(std::string paksPath1, std::string paksPath
     std::wstring integrator_out_wide = converter.from_bytes(integrator_out);
     Output::send<LogLevel::Normal>(integrator_out_wide);
 
+    out_IntegratorOutput = integrator_out_wide;
+
     // check after
     bool modsTxtExistedAfter = 1;
     std::string modsTxtAfter = "";
@@ -444,7 +457,8 @@ std::string AutoIntegrator_integrate(std::string paksPath1, std::string paksPath
     else if (!modsTxtExistedBefore && modsTxtExistedAfter) AutoIntegrator_modsChanged = 1; // if before it didn't exist, and now it does, we need to restart
     else if (!modsTxtExistedBefore && !modsTxtExistedAfter) AutoIntegrator_modsChanged = 0; // if didn't exist before or after, then no need to restart
 
-    return outPath + "/UE4SS";
+    out_ue4ssExtractionPath = outPath + "/UE4SS";
+    return std::filesystem::exists(integratorPakPath);
 }
 
 class AutoIntegrator : public RC::CppUserModBase
@@ -457,7 +471,7 @@ public:
     AutoIntegrator() : CppUserModBase()
     {
         ModName = STR("AutoIntegrator");
-        ModVersion = STR("1.0.6");
+        ModVersion = STR("1.0.7");
         ModDescription = STR("atenfyr's AutoIntegrator, for loading classic AstroModLoader mods through UE4SS");
         ModAuthors = STR("atenfyr");
 
@@ -567,13 +581,50 @@ public:
 
         if (outPath == "LogicMods") outPath = logicMods_dir;
 
+        // some setup for popup window and restart logic
+        bool restartGame = 0;
+        bool ignoreCommandLineParametersRegardingRestarts = 0;
+        wchar_t exe_path_buffer[1024];
+        GetModuleFileNameW(GetModuleHandle(nullptr), exe_path_buffer, 1023);
+        std::wstring game_exe_path = exe_path_buffer;
+
         // integrate
-        std::string newModsDirectory = AutoIntegrator_integrate(paksPath, logicMods_dir, folder_path, outPath);
+        std::string newModsDirectory = "";
+        std::wstring out_IntegratorOutput = L"";
+        bool success = AutoIntegrator_integrate(paksPath, logicMods_dir, folder_path, outPath, newModsDirectory, out_IntegratorOutput);
+
+        // if something went wrong, we should display a pop-up warning, unless on server
+        if (!success)
+        {
+            AutoIntegrator_extractedLua = 0;
+            Output::send<LogLevel::Error>(L"!!! Integration failed !!!\n");
+        }
+        if (!success && !game_exe_path.contains(L"AstroServer"))
+        {
+            std::wstring popupMessage = L"AstroModIntegrator Classic " + ver_wide_cpp + L" was not able to successfully integrate your mods.\nWould you like to close the game, try again, or continue without mods?\n\n" + out_IntegratorOutput;
+            int msgboxID = MessageBoxW(NULL, popupMessage.c_str(), TEXT("AutoIntegrator"), MB_CANCELTRYCONTINUE);
+            switch (msgboxID)
+            {
+                case IDTRYAGAIN:
+                    restartGame = 1;
+                    ignoreCommandLineParametersRegardingRestarts = 1;
+                    Output::send<LogLevel::Verbose>(L"User elected to try again; restarting game\n");
+                    break;
+                case IDCONTINUE:
+                    Output::send<LogLevel::Verbose>(L"User elected to continue; doing nothing\n");
+                    break;
+                case IDCANCEL:
+                default:
+                    std::exit(0);
+                    Output::send<LogLevel::Verbose>(L"User elected to cancel; closing game\n");
+                    break;
+            }
+        }
 
         // delete all folders named "shared" except for the one under newModsDirectory
         // unless: newModsDirectory doesn't exist, then we keep the current shared folder unchanged
         // (also, don't do this unless we actually extracted lua mods)
-        if (AutoIntegrator_extractedLua && std::filesystem::is_directory(newModsDirectory))
+        if (AutoIntegrator_extractedLua && !newModsDirectory.empty() && std::filesystem::is_directory(newModsDirectory))
         {
             std::filesystem::path beforeDir = AutoIntegrator_PassPathThroughShimloader(converter.from_bytes(newModsDirectory));
             std::filesystem::path beforeDirWithShared = beforeDir / "shared";
@@ -602,7 +653,6 @@ public:
         }
 
         // update this code whenever any game update breaks UE4SS
-        bool restartGame = 0;
         if (overrideEngineVersionAndSignatures && !ue4ssProgram.m_has_game_specific_config)
         {
             Output::send<LogLevel::Normal>(L"Overriding engine version and signatures for Astroneer\n");
@@ -703,14 +753,20 @@ public:
             std::wstring argument = argv[i];
             if (argument == L"--AutoIntegratorReboot")
             {
-                Output::send<LogLevel::Normal>(L"Forcing restartGame = 1\n");
-                restartGame = 1;
+                if (!ignoreCommandLineParametersRegardingRestarts)
+                {
+                    Output::send<LogLevel::Normal>(L"Forcing restartGame = 1\n");
+                    restartGame = 1;
+                }
             }
             else if (argument == L"--AutoIntegratorNoReboot")
             {
-                Output::send<LogLevel::Normal>(L"Forcing restartGame = 0\n");
-                if (restartGame) Output::send<LogLevel::Warning>(L"restartGame was 1 before!\n");
-                restartGame = 0;
+                if (!ignoreCommandLineParametersRegardingRestarts)
+                {
+                    Output::send<LogLevel::Normal>(L"Forcing restartGame = 0\n");
+                    if (restartGame) Output::send<LogLevel::Warning>(L"restartGame was 1 before!\n");
+                    restartGame = 0;
+                }
             }
             else
             {
@@ -732,9 +788,6 @@ public:
 
             try
             {
-                wchar_t exe_path_buffer[1024];
-                GetModuleFileNameW(GetModuleHandle(nullptr), exe_path_buffer, 1023);
-                std::wstring game_exe_path = exe_path_buffer;
                 auto const errorCode = reinterpret_cast<INT_PTR>(ShellExecuteW(
                     NULL,
                     L"open",

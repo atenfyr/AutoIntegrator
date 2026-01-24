@@ -214,9 +214,19 @@ bool AutoIntegrator_download_exe(std::string folder_path, std::string ver)
                 // download file
                 if (res->status == httplib::StatusCode::OK_200)
                 {
-                    std::ofstream fs(folder_path + (isLinux ? "/ModIntegrator" : "/ModIntegrator.exe"), std::ios::out | std::ios::binary);
+                    std::string newExePath = folder_path + (isLinux ? "/ModIntegrator" : "/ModIntegrator.exe");
+                    
+                    std::ofstream fs(newExePath, std::ios::out | std::ios::binary);
                     fs.write((res->body).data(), (res->body).size());
                     fs.close();
+
+                    if (isLinux)
+                    {
+                        std::filesystem::permissions(newExePath, std::filesystem::perms::owner_read | std::filesystem::perms::owner_write | std::filesystem::perms::owner_exec |
+                            std::filesystem::perms::group_read | std::filesystem::perms::group_exec |
+                            std::filesystem::perms::others_read | std::filesystem::perms::others_exec, std::filesystem::perm_options::replace);
+                    }
+
                     Output::send<LogLevel::Normal>(L"Successfully downloaded ModIntegrator\n");
                     success2 = true;
                 }
@@ -606,17 +616,17 @@ public:
             switch (msgboxID)
             {
                 case IDTRYAGAIN:
+                    Output::send<LogLevel::Verbose>(L"User elected to try again; restarting game\n");
                     restartGame = 1;
                     ignoreCommandLineParametersRegardingRestarts = 1;
-                    Output::send<LogLevel::Verbose>(L"User elected to try again; restarting game\n");
                     break;
                 case IDCONTINUE:
                     Output::send<LogLevel::Verbose>(L"User elected to continue; doing nothing\n");
                     break;
                 case IDCANCEL:
                 default:
-                    std::exit(0);
                     Output::send<LogLevel::Verbose>(L"User elected to cancel; closing game\n");
+                    std::exit(0);
                     break;
             }
         }

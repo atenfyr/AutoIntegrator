@@ -457,7 +457,7 @@ public:
     AutoIntegrator() : CppUserModBase()
     {
         ModName = STR("AutoIntegrator");
-        ModVersion = STR("1.0.4");
+        ModVersion = STR("1.0.5");
         ModDescription = STR("atenfyr's AutoIntegrator, for loading classic AstroModLoader mods through UE4SS");
         ModAuthors = STR("atenfyr");
 
@@ -575,26 +575,29 @@ public:
         // (also, don't do this unless we actually extracted lua mods)
         if (AutoIntegrator_extractedLua && std::filesystem::is_directory(newModsDirectory))
         {
+            std::filesystem::path beforeDir = AutoIntegrator_PassPathThroughShimloader(converter.from_bytes(newModsDirectory));
+            std::filesystem::path beforeDirWithShared = beforeDir / "shared";
+
             for (std::filesystem::path this_mods_directory : ue4ssProgram.get_mods_directories())
             {
-                if (AutoIntegrator_PassPathThroughShimloader(this_mods_directory) == AutoIntegrator_PassPathThroughShimloader(converter.from_bytes(newModsDirectory))) continue;
-                std::filesystem::path pathToDelete = this_mods_directory / "shared";
+                std::filesystem::path pathToDelete = AutoIntegrator_PassPathThroughShimloader(this_mods_directory);
+                if (pathToDelete == beforeDir) continue;
+                
+                pathToDelete = pathToDelete / "shared";
 
                 std::error_code errorCode;
                 std::filesystem::remove_all(pathToDelete, errorCode);
                 if (!static_cast<bool>(errorCode) && !errorCode.message().contains("successfully")) // seems to always want to print even when succeeded... only print Normal not Error just in case
                 {
-                    const std::wstring pathToDeleteW = pathToDelete;
-                    Output::send<LogLevel::Normal>(L"Failed to delete directory \"" + pathToDeleteW + L"\": " + converter.from_bytes(errorCode.message()) + L"\n");
+                    Output::send<LogLevel::Normal>(L"Failed to delete directory \"" + pathToDelete.wstring() + L"\": " + converter.from_bytes(errorCode.message()) + L"\n");
                 }
-            }
 
-            // move mods_directory shared folder to main mods directory
-            std::error_code errorCode;
-            std::filesystem::rename(newModsDirectory + "/shared", ue4ssProgram.get_mods_directories()[0] / "shared", errorCode);
-            if (!static_cast<bool>(errorCode) && !errorCode.message().contains("successfully")) // seems to always want to print even when succeeded... only print Normal not Error just in case
-            {
-                Output::send<LogLevel::Normal>(L"Failed to rename directory \"" + converter.from_bytes(newModsDirectory) + L"/shared\": " + converter.from_bytes(errorCode.message()) + L"\n");
+                // copy mods_directory shared folder here
+                std::filesystem::copy(beforeDirWithShared, pathToDelete, std::filesystem::copy_options::overwrite_existing | std::filesystem::copy_options::recursive, errorCode);
+                if (!static_cast<bool>(errorCode) && !errorCode.message().contains("successfully")) // seems to always want to print even when succeeded... only print Normal not Error just in case
+                {
+                    Output::send<LogLevel::Normal>(L"Failed to rename directory \"" + AutoIntegrator_PassPathThroughShimloader(beforeDirWithShared.wstring()) + L"\" to \"" + AutoIntegrator_PassPathThroughShimloader(pathToDelete.wstring()) + L"\": " + converter.from_bytes(errorCode.message()) + L"\n");
+                }
             }
         }
 
@@ -693,6 +696,7 @@ public:
         if (AutoIntegrator_modsChanged) restartGame = 1;
 
         int nArgs = 0;
+        std::wstring all_args_as_string = L"";
         LPWSTR* argv = CommandLineToArgvW(GetCommandLineW(), &nArgs);
         for (int i = 0; i < nArgs; i++)
         {
@@ -702,11 +706,15 @@ public:
                 Output::send<LogLevel::Normal>(L"Forcing restartGame = 1\n");
                 restartGame = 1;
             }
-            if (argument == L"--AutoIntegratorNoReboot")
+            else if (argument == L"--AutoIntegratorNoReboot")
             {
                 Output::send<LogLevel::Normal>(L"Forcing restartGame = 0\n");
                 if (restartGame) Output::send<LogLevel::Warning>(L"restartGame was 1 before!\n");
                 restartGame = 0;
+            }
+            else
+            {
+                all_args_as_string += argument + L" ";
             }
         }
         LocalFree(argv);
@@ -724,7 +732,7 @@ public:
                     NULL,
                     L"open",
                     game_exe_path.c_str(),
-                    L"--AutoIntegratorNoReboot",
+                    (all_args_as_string + L"--AutoIntegratorNoReboot").c_str(),
                     NULL,
                     SW_SHOWNORMAL
                 ));

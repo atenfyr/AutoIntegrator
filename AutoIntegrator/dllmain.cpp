@@ -457,7 +457,7 @@ public:
     AutoIntegrator() : CppUserModBase()
     {
         ModName = STR("AutoIntegrator");
-        ModVersion = STR("1.0.5");
+        ModVersion = STR("1.0.6");
         ModDescription = STR("atenfyr's AutoIntegrator, for loading classic AstroModLoader mods through UE4SS");
         ModAuthors = STR("atenfyr");
 
@@ -714,7 +714,14 @@ public:
             }
             else
             {
-                all_args_as_string += argument + L" ";
+                if (argument.find(' ') != std::string::npos)
+                {
+                    all_args_as_string += L"\"" + argument + L"\" ";
+                }
+                else
+                {
+                    all_args_as_string += argument + L" ";
+                }
             }
         }
         LocalFree(argv);

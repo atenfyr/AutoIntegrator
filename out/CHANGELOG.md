@@ -1,3 +1,6 @@
+v1.0.6:
+- Fixed a major bug in which command line parameters containing spaces would not be passed through properly after AutoIntegrator-induced reboot.
+
 v1.0.5:
 - Further fixes for the Unreal shimloader.
 

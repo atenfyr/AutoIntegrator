@@ -25,7 +25,7 @@ To set up AutoIntegrator v1.0.7+ for Linux (Proton), follow the above steps for 
 2. Install the latest version of protontricks. See this guide: https://github.com/Matoking/protontricks?tab=readme-ov-file#pipx. Using pipx is a good idea to make sure you have the latest version of protontricks.
 3. Execute `protontricks --no-bwrap 361420 dotnet8` and go through any prompts that appear.
 
-You can now launch the game as normal. Mods should typically be installed in the directory at `~/.steam/steam/steamapps/compatdata/361420/pfx/drive_c/users/steamuser/AppData/Local/Astro/Saved/Paks`.
+You can now launch the game as normal. Mods should typically be installed in the directory at `~/.steam/steam/steamapps/common/ASTRONEER/Astro/Content/Paks/LogicMods`.
 
 ## Configuration
 If this mod is installed through UE4SS directly, you can configure this mod by editing the "config.txt" file within the directory of the mod. The default "config.txt" file is as follows:

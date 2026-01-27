@@ -1,3 +1,7 @@
+v1.0.7:
+- Added Linux support through Proton.
+- Added a popup window that appears when integration fails.
+
 v1.0.6:
 - Fixed a major bug in which command line parameters containing spaces would not be passed through properly after AutoIntegrator-induced reboot.
 

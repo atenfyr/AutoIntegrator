@@ -6,11 +6,8 @@ add_library(${TARGET} SHARED
 
 target_include_directories(${TARGET} PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/OpenSSL/3.4.1/include)
 
-if(WIN32)
-  target_link_libraries(${TARGET} PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/OpenSSL/3.4.1/lib/libssl_static.lib)
-  target_link_libraries(${TARGET} PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/OpenSSL/3.4.1/lib/libcrypto_static.lib)
-endif()
-
+target_link_libraries(${TARGET} PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/OpenSSL/3.4.1/lib/libssl_static.lib)
+target_link_libraries(${TARGET} PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/OpenSSL/3.4.1/lib/libcrypto_static.lib)
 target_include_directories(${TARGET} PRIVATE .)
 target_link_libraries(${TARGET} PUBLIC UE4SS)
 add_custom_command(TARGET ${TARGET} POST_BUILD

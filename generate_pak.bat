@@ -26,7 +26,7 @@ move /y ".\pak\UE4SS\config.txt" ".\pak\UE4SS\config_unused.txt"
 repak pack --version V4 --compression Zlib "./pak" "./out/PAK-FOR-AMLC/000-AutoIntegratorForAMLC-1.0.7_P.pak"
 cd "./out/PAK-FOR-AMLC"
 del /S /Q *.zip
-zip AutoIntegratorForAMLC.zip *.pak
+zip -9 AutoIntegratorForAMLC.zip *.pak
 del /S /Q *.pak
 
 echo.

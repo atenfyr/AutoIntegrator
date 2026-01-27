@@ -130,11 +130,8 @@ std::string AutoIntegrator_exec(std::string cmd_cpp, std::string cwd) {
 
 bool AutoIntegrator_check_linux()
 {
-    HMODULE hntdll = GetModuleHandle(L"ntdll.dll");
-    if (!hntdll) return true; // not NT, so we assume on Linux
-
-    void* pwine_get_version = (void*)GetProcAddress(hntdll, "wine_get_version");
-    return pwine_get_version != NULL; // true if running on wine (Linux), false otherwise (Windows)
+    // always run the integrator through wine
+    return false;
 }
 
 bool AutoIntegrator_download_exe(std::string folder_path, std::string ver)
@@ -325,7 +322,7 @@ std::string AutoIntegrator_PassPathThroughShimloader(std::string oldPath)
     return converter.to_bytes(AutoIntegrator_PassPathThroughShimloader(converter.from_bytes(oldPath)));
 }
 
-std::string AutoIntegrator_GetExecutablePath(std::string folderPath)
+std::string AutoIntegrator_GetExecutablePathForCmd(std::string folderPath)
 {
     return AutoIntegrator_PassPathThroughShimloader(folderPath + "/ModIntegrator" + (AutoIntegrator_check_linux() ? "" : ".exe"));
 }
@@ -365,7 +362,7 @@ bool AutoIntegrator_integrate(std::string paksPath1, std::string paksPath2, std:
 
     std::string cwd = AutoIntegrator_PassPathThroughShimloader(folder_path);
 
-    std::string finalCmd = AutoIntegrator_GetExecutablePath(folder_path) + " -i \"" + AutoIntegrator_PassPathThroughShimloader(paksPath1) + "\" \"" + AutoIntegrator_PassPathThroughShimloader(paksPath2) + "\" -g \"" + (game_exec_dir_narrow + "/../../Content/Paks") + "\"";
+    std::string finalCmd = AutoIntegrator_GetExecutablePathForCmd(folder_path) + " -i \"" + AutoIntegrator_PassPathThroughShimloader(paksPath1) + "\" \"" + AutoIntegrator_PassPathThroughShimloader(paksPath2) + "\" -g \"" + (game_exec_dir_narrow + "/../../Content/Paks") + "\"";
     
     // outputFolder
     if (outPath.empty() || outPath == "default") outPath = paksPath1;
@@ -520,7 +517,7 @@ public:
         // init
         try
         {
-            ver = AutoIntegrator_exec(AutoIntegrator_GetExecutablePath(folder_path) + " version", "");
+            ver = AutoIntegrator_exec(AutoIntegrator_GetExecutablePathForCmd(folder_path) + " version", "");
             AutoIntegrator_rtrim(ver);
         }
         catch (const std::runtime_error& err)
@@ -555,7 +552,7 @@ public:
             // re-fetch version in case we auto-updated
             try
             {
-                ver = AutoIntegrator_exec(AutoIntegrator_GetExecutablePath(folder_path) + " version", "");
+                ver = AutoIntegrator_exec(AutoIntegrator_GetExecutablePathForCmd(folder_path) + " version", "");
                 AutoIntegrator_rtrim(ver);
             }
             catch (const std::runtime_error& err)

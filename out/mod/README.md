@@ -18,6 +18,15 @@ Drag-and-drop the "AutoIntegratorForAMLC.zip" file within the "PAK-FOR-AMLC" dir
 ### astro_modloader (Rust)
 This mod is not supported by astro_modloader (the Rust mod loader), which does not have native UE4SS integration support.
 
+## Linux Setup
+To set up AutoIntegrator v1.0.7+ for Linux (Proton), follow the above steps for manual installation with UE4SS, and then perform the following steps:
+
+1. Install the latest version of winetricks. See this guide: https://github.com/Winetricks/winetricks?tab=readme-ov-file#installing. If you are on Debian/Ubuntu, you should perform the steps under "Manual Install" on the winetricks GitHub page to make sure that winetricks is up-to-date.
+2. Install the latest version of protontricks. See this guide: https://github.com/Matoking/protontricks?tab=readme-ov-file#pipx. Using pipx is a good idea to make sure you have the latest version of protontricks.
+3. Execute `protontricks --no-bwrap 361420 dotnet8` and go through any prompts that appear.
+
+You can now launch the game as normal.
+
 ## Configuration
 If this mod is installed through UE4SS directly, you can configure this mod by editing the "config.txt" file within the directory of the mod. The default "config.txt" file is as follows:
 ```

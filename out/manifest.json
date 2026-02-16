@@ -1,8 +1,10 @@
 {
     "name": "AutoIntegrator",
-    "version_number": "1.0.7",
+    "version_number": "1.0.8",
     "author": "atenfyr",
     "website_url": "https://github.com/atenfyr/AutoIntegrator",
     "description": "Load AstroModLoader mods through UE4SS",
-    "dependencies": []
+    "dependencies": [
+        "Thunderstore-unreal_shimloader-1.1.3"
+    ]
 }

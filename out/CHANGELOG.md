@@ -1,3 +1,6 @@
+v1.0.8:
+- Added the Unreal Shimloader as a dependency in Thunderstore.
+
 v1.0.7:
 - Added Linux support through Proton.
 - Added a popup window that appears when integration fails.

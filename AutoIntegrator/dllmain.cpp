@@ -465,7 +465,7 @@ bool AutoIntegrator_integrate(std::string paksPath1, std::string paksPath2, std:
     else if (!modsTxtExistedBefore && !modsTxtExistedAfter) AutoIntegrator_modsChanged = 0; // if didn't exist before or after, then no need to restart
 
     out_ue4ssExtractionPath = outPath + "/UE4SS";
-    return std::filesystem::exists(integratorPakPath);
+    return std::filesystem::exists(integratorPakPath) || integrator_out_wide.contains(L"Finished integrating");
 }
 
 class AutoIntegrator : public RC::CppUserModBase

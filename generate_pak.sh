@@ -17,7 +17,7 @@ cp -r "./out/mod" "./pak/UE4SS"
 
 sed -i "0,/LogicMods/s//default/" "./pak/UE4SS/config.txt"
 
-repak pack --version V4 --compression Zlib "./pak" "./out/PAK-FOR-AMLC/000-AutoIntegratorForAMLC-1.0.7_P.pak"
+repak pack --version V4 --compression Zlib "./pak" "./out/PAK-FOR-AMLC/000-AutoIntegratorForAMLC-1.0.9_P.pak"
 cd "./out/PAK-FOR-AMLC"
 rm *.zip
 zip -9 AutoIntegratorForAMLC.zip *.pak

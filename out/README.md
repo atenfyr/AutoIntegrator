@@ -9,6 +9,13 @@ This is a UE4SS mod that executes [AstroModIntegrator Classic](https://github.co
 * Configurable for different use-cases
 
 ## Manual Installation
+
+### r2modman/Thunderstore Mod Manager/Gale
+Simply install AutoIntegrator normally as you would any other Thunderstore mod. AutoIntegrator is a required pre-requisite to use most .pak mods with these mod managers.
+
+### Vortex
+The built-in Vortex extension for Astroneer automatically downloads AutoIntegrator. If needed, you can also install the extension manually here: https://www.nexusmods.com/site/mods/1547
+
 ### UE4SS
 First, install UE4SS (experimental v3.0.1-788 or later: https://github.com/UE4SS-RE/RE-UE4SS/releases/download/experimental/UE4SS_v3.0.1-788-g9a20a8f.zip, or this fork https://github.com/atenfyr/RE-UE4SS/releases, which is tested to work for Astroneer). Simply drag the "mod" folder within this .zip file into the folder you are using for UE4SS mods. This is typically the "Astro\Binaries\Win64\Mods" folder within the game installation, meaning you will then have a folder at "Astro\Binaries\Win64\Mods\mod". You can then install your AstroModLoader mods into the "Astro\Content\Paks\LogicMods" directory.
 
@@ -19,7 +26,7 @@ Drag-and-drop the "AutoIntegratorForAMLC.zip" file within the "PAK-FOR-AMLC" dir
 This mod is not supported by astro_modloader (the Rust mod loader), which does not have native UE4SS integration support.
 
 ## Linux Setup
-To set up AutoIntegrator v1.0.7+ for Linux (Proton), follow the above steps for manual installation with UE4SS, and then perform the following steps:
+To set up AutoIntegrator v1.0.7+ for Linux (Proton), follow the above steps for installation with UE4SS or a compatible mod manager of your choice, and then perform the following steps:
 
 1. Install the latest version of winetricks. See this guide: https://github.com/Winetricks/winetricks?tab=readme-ov-file#installing. If you are on Debian/Ubuntu, you should perform the steps under "Manual Install" on the winetricks GitHub page to make sure that winetricks is up-to-date.
 2. Install the latest version of protontricks. See this guide: https://github.com/Matoking/protontricks?tab=readme-ov-file#pipx. Using pipx is a good idea to make sure you have the latest version of protontricks.

@@ -1,3 +1,6 @@
+v1.0.9:
+- Fixed a bug where the failed integration pop-up would sometimes occasionally appear even when integration succeeded.
+
 v1.0.8:
 - Added the Unreal Shimloader as a dependency in Thunderstore.
 

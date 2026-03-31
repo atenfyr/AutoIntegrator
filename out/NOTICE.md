@@ -4,7 +4,7 @@ The following is a list of licenses for the third-party material used in this so
 ## AstroModIntegrator
 https://github.com/atenfyr/AstroModLoader-Classic/tree/master/AstroModIntegrator
 
-Copyright (c) 2024 AstroTechies, atenfyr
+Copyright (c) 2026 AstroTechies, atenfyr
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -260,7 +260,7 @@ https://github.com/atenfyr/UAssetAPI
 
 MIT License
 
-Copyright (c) 2024 Atenfyr
+Copyright (c) 2020 - 2026 atenfyr
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal

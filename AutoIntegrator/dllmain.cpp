@@ -478,7 +478,7 @@ public:
     AutoIntegrator() : CppUserModBase()
     {
         ModName = STR("AutoIntegrator");
-        ModVersion = STR("1.0.9");
+        ModVersion = STR("1.0.10");
         ModDescription = STR("atenfyr's AutoIntegrator, for loading classic AstroModLoader mods through UE4SS");
         ModAuthors = STR("atenfyr");
 
@@ -519,6 +519,7 @@ public:
         {
             ver = AutoIntegrator_exec(AutoIntegrator_GetExecutablePathForCmd(folder_path) + " version", "");
             AutoIntegrator_rtrim(ver);
+            if (ver.length() > 20) ver = "0.0.0.0"; // fallback if output was an error message
         }
         catch (const std::runtime_error& err)
         {

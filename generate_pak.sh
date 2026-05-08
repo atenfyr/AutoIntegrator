@@ -29,4 +29,6 @@ rm *.pak
 cd ..
 zip -9 -r ../atenfyr-AutoIntegrator-$(cat ../version.txt).zip *
 
+cd ..
+
 echo "All done!"

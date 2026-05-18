@@ -134,6 +134,21 @@ bool AutoIntegrator_check_linux()
     return false;
 }
 
+std::wstring AutoIntegrator_get_env_var(std::wstring varName)
+{
+	LPCWSTR varName_cstr = varName.c_str();
+    DWORD bufferSize = GetEnvironmentVariableW(varName_cstr, NULL, 0);
+
+    if (bufferSize > 0)
+    {
+        std::vector<wchar_t> buffer(bufferSize);
+        GetEnvironmentVariableW(varName_cstr, buffer.data(), bufferSize);
+        std::wstring evar = std::wstring(buffer.data());
+        return evar;
+    }
+    return L"";
+}
+
 bool AutoIntegrator_download_exe(std::string folder_path, std::string ver)
 {
     Output::send<LogLevel::Normal>(L"Checking for updates to AstroModIntegrator Classic...\n");
@@ -679,10 +694,11 @@ public:
                 in.close();
 
                 std::string outText = buffer.str();
+                outText = std::regex_replace(outText, std::regex("\\r\\n"), "\n");
+                std::string outTextBefore = outText;
                 outText = std::regex_replace(outText, std::regex("MajorVersion\\s*=.*\\n"), "MajorVersion = 4\n");
                 outText = std::regex_replace(outText, std::regex("MinorVersion\\s*=.*\\n"), "MinorVersion = 27\n");
 
-                std::string outTextBefore = outText;
                 if (AutoIntegrator_extractedLua) // AutoIntegrator_extractedLua is set after integration
                 {
                     if (outText.contains("; AMLC"))
@@ -727,9 +743,9 @@ public:
                 throw;
             }
 
-            // provide signature
+            // provide signature (not needed anymore for newer versions of UE4SS)
             // this relies on UE4SS commit d0479fd or later
-            try
+            /*try
             {
                 std::string signatureValue = "-- Signature produced by CorporalWill123\nfunction Register()\n    return \"FF 50 08 90 48 8B C7 83 4F 10 12 4C 8D 5C 24 70 49 8B 5B 28\"\nend\n\nfunction OnMatchFound(MatchAddress)\n    return MatchAddress - 0x173\nend\n\n";
 
@@ -747,7 +763,7 @@ public:
             {
                 Output::send<LogLevel::Error>(L"Failed to create FText_Constructor.lua for an unknown reason\n");
                 throw;
-            }
+            }*/
         }
 
         // restart game if need
@@ -756,7 +772,11 @@ public:
         int nArgs = 0;
         std::wstring all_args_as_string = L"";
         LPWSTR* argv = CommandLineToArgvW(GetCommandLineW(), &nArgs);
-        for (int i = 0; i < nArgs; i++)
+        bool hasModDir = false;
+        bool hasPakDir = false;
+        bool hasCfgDir = false;
+        bool hasOverlayDir = false;
+        for (int i = 1; i < nArgs; i++)
         {
             std::wstring argument = argv[i];
             if (argument == L"--AutoIntegratorReboot")
@@ -787,8 +807,47 @@ public:
                     all_args_as_string += argument + L" ";
                 }
             }
+            
+            if (argument == L"--mod-dir") hasModDir = true;
+            if (argument == L"--pak-dir") hasPakDir = true;
+            if (argument == L"--cfg-dir") hasCfgDir = true;
+            if (argument == L"--overlay-dir") hasOverlayDir = true;
         }
+
+        // if envr variables available from shimloader but not equivalent command line parameters, we need to specify them ourselves
+        {
+			std::wstring dirVar = AutoIntegrator_get_env_var(L"SHIMLOADER_MOD_DIR");
+            if (!hasModDir && !dirVar.empty())
+            {
+                all_args_as_string += L"--mod-dir \"" + dirVar + L"\" ";
+            }
+        }
+        {
+            std::wstring dirVar = AutoIntegrator_get_env_var(L"SHIMLOADER_PAK_DIR");
+            if (!hasPakDir && !dirVar.empty())
+            {
+                all_args_as_string += L"--pak-dir \"" + dirVar + L"\" ";
+            }
+        }
+        {
+            std::wstring dirVar = AutoIntegrator_get_env_var(L"SHIMLOADER_CFG_DIR");
+            if (!hasCfgDir && !dirVar.empty())
+            {
+                all_args_as_string += L"--cfg-dir \"" + dirVar + L"\" ";
+            }
+        }
+        {
+            std::wstring dirVar = AutoIntegrator_get_env_var(L"SHIMLOADER_OVERLAY_DIR");
+            if (!hasOverlayDir && !dirVar.empty())
+            {
+                all_args_as_string += L"--overlay-dir \"" + dirVar + L"\" ";
+            }
+        }
+
         LocalFree(argv);
+        Output::send<LogLevel::Verbose>(all_args_as_string + L"\n");
+
+        all_args_as_string += L"--AutoIntegratorNoReboot";
 
         if (restartGame)
         {
@@ -800,7 +859,7 @@ public:
                     NULL,
                     L"open",
                     game_exe_path.c_str(),
-                    (all_args_as_string + L"--AutoIntegratorNoReboot").c_str(),
+                    all_args_as_string.c_str(),
                     NULL,
                     SW_SHOWNORMAL
                 ));
